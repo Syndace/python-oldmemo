@@ -12,7 +12,7 @@ except ImportError as e:
         " `pip install python-twomemo[xml]`, to use the ElementTree-based XML serialization/parser helpers."
     ) from e
 
-from .twomemo import TwomemoBundle, TwomemoContent, TwomemoEncryptedKeyMaterial, TwomemoKeyExchange
+from .twomemo import BundleImpl, ContentImpl, EncryptedKeyMaterialImpl, KeyExchangeImpl
 
 
 __all__ = [  # pylint: disable=unused-variable
@@ -193,7 +193,7 @@ def parse_device_list(element: ET.Element) -> Dict[int, Optional[str]]:
     }
 
 
-def serialize_bundle(bundle: TwomemoBundle) -> ET.Element:
+def serialize_bundle(bundle: BundleImpl) -> ET.Element:
     """
     Args:
         bundle: The bundle to serialize.
@@ -235,7 +235,7 @@ def serialize_bundle(bundle: TwomemoBundle) -> ET.Element:
     return bundle_elt
 
 
-def parse_bundle(element: ET.Element, bare_jid: str, device_id: int) -> TwomemoBundle:
+def parse_bundle(element: ET.Element, bare_jid: str, device_id: int) -> BundleImpl:
     """
     Args:
         element: The XML element to parse the bundle from.
@@ -255,7 +255,7 @@ def parse_bundle(element: ET.Element, bare_jid: str, device_id: int) -> TwomemoB
     spk_elt = cast(ET.Element, element.find(f"{NAMESPACE}spk"))
     pk_elts = list(element.iter(f"{NAMESPACE}pk"))
 
-    return TwomemoBundle(
+    return BundleImpl(
         bare_jid,
         device_id,
         x3dh.Bundle(
@@ -278,7 +278,7 @@ def serialize_message(message: Message) -> ET.Element:
         The serialized message as an XML element.
     """
 
-    assert isinstance(message.content, TwomemoContent)
+    assert isinstance(message.content, ContentImpl)
 
     encrypted_elt = ET.Element(f"{NAMESPACE}encrypted")
 
@@ -289,7 +289,7 @@ def serialize_message(message: Message) -> ET.Element:
 
         keys = { key for key in message.keys if key[0].bare_jid == bare_jid }
         for encrypted_key_material, key_exchange in keys:
-            assert isinstance(encrypted_key_material, TwomemoEncryptedKeyMaterial)
+            assert isinstance(encrypted_key_material, EncryptedKeyMaterialImpl)
 
             key_elt = ET.SubElement(
                 keys_elt,
@@ -302,7 +302,7 @@ def serialize_message(message: Message) -> ET.Element:
             if key_exchange is None:
                 key_elt.text = base64.b64encode(authenticated_message).decode("ASCII")
             else:
-                assert isinstance(key_exchange, TwomemoKeyExchange)
+                assert isinstance(key_exchange, KeyExchangeImpl)
 
                 key_elt.set("kex", "true")
                 key_elt.text = base64.b64encode(key_exchange.serialize(authenticated_message)).decode("ASCII")
@@ -344,14 +344,14 @@ def parse_message(element: ET.Element, bare_jid: str) -> Message:
             recipient_device_id = int(cast(str, key_elt.get("rid")))
             content = base64.b64decode(cast(str, key_elt.text))
 
-            key_exchange: Optional[TwomemoKeyExchange] = None
+            key_exchange: Optional[KeyExchangeImpl] = None
             authenticated_message: bytes
             if bool(key_elt.get("kex", False)):
-                key_exchange, authenticated_message = TwomemoKeyExchange.parse(content)
+                key_exchange, authenticated_message = KeyExchangeImpl.parse(content)
             else:
                 authenticated_message = content
 
-            encrypted_key_material = TwomemoEncryptedKeyMaterial.parse(
+            encrypted_key_material = EncryptedKeyMaterialImpl.parse(
                 authenticated_message,
                 recipient_bare_jid,
                 recipient_device_id
@@ -364,9 +364,9 @@ def parse_message(element: ET.Element, bare_jid: str) -> Message:
         bare_jid,
         int(cast(str, cast(ET.Element, element.find(f"{NAMESPACE}header")).get("sid"))),
         (
-            TwomemoContent.make_empty()
+            ContentImpl.make_empty()
             if payload_elt is None
-            else TwomemoContent(base64.b64decode(cast(str, payload_elt.text)))
+            else ContentImpl(base64.b64decode(cast(str, payload_elt.text)))
         ),
         keys
     )

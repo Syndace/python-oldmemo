@@ -41,23 +41,26 @@ from .schema_pb2 import (  # pylint: disable=no-name-in-module
 
 __all__ = [  # pylint: disable=unused-variable
     "Twomemo",
-    "TwomemoAEAD",
-    "TwomemoBundle",
-    "TwomemoContent",
-    "TwomemoDoubleRatchet",
-    "TwomemoEncryptedKeyMaterial",
-    "TwomemoKeyExchange",
-    "TwomemoMessageChainKDF",
-    "TwomemoPlainKeyMaterial",
-    "TwomemoRootChainKDF",
-    "TwomemoSession",
-    "TwomemoState"
+    "AEADImpl",
+    "BundleImpl",
+    "ContentImpl",
+    "DoubleRatchetImpl",
+    "EncryptedKeyMaterialImpl",
+    "KeyExchangeImpl",
+    "MessageChainKDFImpl",
+    "PlainKeyMaterialImpl",
+    "RootChainKDFImpl",
+    "SessionImpl",
+    "StateImpl"
 ]
 
 
-class TwomemoRootChainKDF(kdf_hkdf.KDF):
+NAMESPACE = "urn:xmpp:omemo:2"
+
+
+class RootChainKDFImpl(kdf_hkdf.KDF):
     """
-    The KDF used by Twomemo as part of the Double Ratchet's root chain.
+    The root chain KDF implementation used by this version of the specification.
     """
 
     @staticmethod
@@ -69,9 +72,9 @@ class TwomemoRootChainKDF(kdf_hkdf.KDF):
         return "OMEMO Root Chain".encode("ASCII")
 
 
-class TwomemoMessageChainKDF(kdf_separate_hmacs.KDF):
+class MessageChainKDFImpl(kdf_separate_hmacs.KDF):
     """
-    The KDF used by Twomemo as part of the Double Ratchet's message chain.
+    The message chain KDF implementation used by this version of the specification.
     """
 
     @staticmethod
@@ -79,13 +82,13 @@ class TwomemoMessageChainKDF(kdf_separate_hmacs.KDF):
         return HashFunction.SHA_256
 
 
-class TwomemoAEAD(aead_aes_hmac.AEAD):
+class AEADImpl(aead_aes_hmac.AEAD):
     """
-    The AEAD used by Twomemo as part of the Double Ratchet. While this implementation derives from
+    The AEAD used by this backend as part of the Double Ratchet. While this implementation derives from
     :class:`doubleratchet.recommended.aead_aes_hmac.AEAD`, it actually doesn't use any of its code. This is
     due to a minor difference in the way the associated data is built. The derivation only has symbolic value.
 
-    Can only be used with :class:`TwomemoDoubleRatchet`, due to the reliance on a certain structure of the
+    Can only be used with :class:`DoubleRatchetImpl`, due to the reliance on a certain structure of the
     associated data.
     """
 
@@ -208,7 +211,7 @@ class TwomemoAEAD(aead_aes_hmac.AEAD):
     @staticmethod
     def __parse_associated_data(associated_data: bytes) -> Tuple[bytes, doubleratchet.Header]:
         """
-        Parse the associated data as built by :meth:`TwomemoDoubleRatchet._build_associated_data`.
+        Parse the associated data as built by :meth:`DoubleRatchetImpl._build_associated_data`.
 
         Args:
             associated_data: The associated data.
@@ -221,9 +224,9 @@ class TwomemoAEAD(aead_aes_hmac.AEAD):
         return associated_data, doubleratchet.Header(omemo_message.dh_pub, omemo_message.pn, omemo_message.n)
 
 
-class TwomemoDoubleRatchet(doubleratchet.DoubleRatchet):
+class DoubleRatchetImpl(doubleratchet.DoubleRatchet):
     """
-    The Double Ratchet used by Twomemo.
+    The Double Ratchet implementation used by this version of the specification.
     """
 
     @staticmethod
@@ -235,9 +238,9 @@ class TwomemoDoubleRatchet(doubleratchet.DoubleRatchet):
         ).SerializeToString(True)
 
 
-class TwomemoState(x3dh.BaseState):
+class StateImpl(x3dh.BaseState):
     """
-    The X3DH state used by Twomemo.
+    The X3DH state implementation used by this version of the specification.
     """
 
     @staticmethod
@@ -245,10 +248,9 @@ class TwomemoState(x3dh.BaseState):
         return pub
 
 
-class TwomemoBundle(Bundle):
+class BundleImpl(Bundle):
     """
-    :class:`~omemo.bundle.Bundle` implementation used by the :class:`Twomemo` backend implementation,
-    providing OMEMO under the `urn:xmpp:omemo:2` backend.
+    :class:`~omemo.bundle.Bundle` implementation as a simple storage type.
     """
 
     def __init__(
@@ -276,7 +278,7 @@ class TwomemoBundle(Bundle):
 
     @property
     def namespace(self) -> str:
-        return "urn:xmpp:omemo:2"
+        return NAMESPACE
 
     @property
     def bare_jid(self) -> str:
@@ -291,7 +293,7 @@ class TwomemoBundle(Bundle):
         return self.__bundle.identity_key
 
     def __eq__(self, other: object) -> bool:
-        if isinstance(other, TwomemoBundle):
+        if isinstance(other, BundleImpl):
             return (
                 other.bare_jid == self.bare_jid
                 and other.device_id == self.device_id
@@ -339,10 +341,9 @@ class TwomemoBundle(Bundle):
         return dict(self.__pre_key_ids)
 
 
-class TwomemoContent(Content):
+class ContentImpl(Content):
     """
-    :class:`~omemo.message.Content` implementation used by the :class:`Twomemo` backend implementation,
-    providing OMEMO under the `urn:xmpp:omemo:2` backend.
+    :class:`~omemo.message.Content` implementation as a simple storage type.
     """
 
     def __init__(self, ciphertext: bytes) -> None:
@@ -357,14 +358,14 @@ class TwomemoContent(Content):
         self.__ciphertext = ciphertext
 
     @staticmethod
-    def make_empty() -> TwomemoContent:
+    def make_empty() -> ContentImpl:
         """
         Returns:
             An "empty" instance, i.e. one that corresponds to an empty OMEMO message as per the specification.
             The ciphertext stored in empty instances is a byte string of zero length.
         """
 
-        return TwomemoContent(b"")
+        return ContentImpl(b"")
 
     @property
     def ciphertext(self) -> bytes:
@@ -385,10 +386,9 @@ class TwomemoContent(Content):
         return self.__ciphertext == b""
 
 
-class TwomemoEncryptedKeyMaterial(EncryptedKeyMaterial):
+class EncryptedKeyMaterialImpl(EncryptedKeyMaterial):
     """
-    :class:`~omemo.message.EncryptedKeyMaterial` implementation used by the :class:`Twomemo` backend
-    implementation, providing OMEMO under the `urn:xmpp:omemo:2` backend.
+    :class:`~omemo.message.EncryptedKeyMaterial` implementation as a simple storage type.
     """
 
     def __init__(
@@ -432,12 +432,12 @@ class TwomemoEncryptedKeyMaterial(EncryptedKeyMaterial):
             instance.
         """
 
-        # The ciphertext field contains the result of :meth:`TwomemoAEAD.encrypt`, which is a serialized
+        # The ciphertext field contains the result of :meth:`AEADImpl.encrypt`, which is a serialized
         # OMEMOAuthenticatedMessage with all fields already correctly set, thus it can be used here as is.
         return self.__encrypted_message.ciphertext
 
     @staticmethod
-    def parse(authenticated_message: bytes, bare_jid: str, device_id: int) -> TwomemoEncryptedKeyMaterial:
+    def parse(authenticated_message: bytes, bare_jid: str, device_id: int) -> EncryptedKeyMaterialImpl:
         """
         Args:
             authenticated_message: A serialized OMEMOAuthenticatedMessage message structure.
@@ -451,7 +451,7 @@ class TwomemoEncryptedKeyMaterial(EncryptedKeyMaterial):
         # Parse the OMEMOAuthenticatedMessage and OMEMOMessage structures to extract the header.
         message = OMEMOMessage.FromString(OMEMOAuthenticatedMessage.FromString(authenticated_message).message)
 
-        return TwomemoEncryptedKeyMaterial(
+        return EncryptedKeyMaterialImpl(
             bare_jid,
             device_id,
             doubleratchet.EncryptedMessage(
@@ -461,10 +461,9 @@ class TwomemoEncryptedKeyMaterial(EncryptedKeyMaterial):
         )
 
 
-class TwomemoPlainKeyMaterial(PlainKeyMaterial):
+class PlainKeyMaterialImpl(PlainKeyMaterial):
     """
-    :class:`~omemo.message.PlainKeyMaterial` implementation used by the :class:`Twomemo` backend
-    implementation, providing OMEMO under the `urn:xmpp:omemo:2` backend.
+    :class:`~omemo.message.PlainKeyMaterial` implementation as a simple storage type.
     """
 
     def __init__(self, key: bytes, auth_tag: bytes) -> None:
@@ -509,10 +508,9 @@ class TwomemoPlainKeyMaterial(PlainKeyMaterial):
         return self.__key == b"\x00" * 32 and self.__auth_tag == b""
 
 
-class TwomemoKeyExchange(KeyExchange):
+class KeyExchangeImpl(KeyExchange):
     """
-    :class:`~omemo.message.KeyExchange` implementation used by the :class:`Twomemo` backend implementation,
-    providing OMEMO under the `urn:xmpp:omemo:2` backend.
+    :class:`~omemo.message.KeyExchange` implementation as a simple storage type.
     """
 
     def __init__(self, header: x3dh.Header, signed_pre_key_id: int, pre_key_id: int) -> None:
@@ -532,7 +530,7 @@ class TwomemoKeyExchange(KeyExchange):
         return self.__header.identity_key
 
     def __eq__(self, other: object) -> bool:
-        if isinstance(other, TwomemoKeyExchange):
+        if isinstance(other, KeyExchangeImpl):
             return (
                 other.header == self.header
                 and other.signed_pre_key_id == self.signed_pre_key_id
@@ -600,7 +598,7 @@ class TwomemoKeyExchange(KeyExchange):
         ).SerializeToString(True)
 
     @staticmethod
-    def parse(key_exchange: bytes) -> Tuple[TwomemoKeyExchange, bytes]:
+    def parse(key_exchange: bytes) -> Tuple[KeyExchangeImpl, bytes]:
         """
         Args:
             key_exchange: A serialized OMEMOKeyExchange message structure.
@@ -619,19 +617,16 @@ class TwomemoKeyExchange(KeyExchange):
 
         parsed = OMEMOKeyExchange.FromString(key_exchange)
 
-        return TwomemoKeyExchange(
+        return KeyExchangeImpl(
             x3dh.Header(parsed.ik, parsed.ek, b"", b""),
             parsed.spk_id,
             parsed.pk_id
         ), parsed.message.SerializeToString(True)
 
 
-class TwomemoSession(Session):
+class SessionImpl(Session):
     """
-    :class:`~omemo.session.Session` implementation used by the :class:`Twomemo` backend implementation,
-    providing OMEMO under the `urn:xmpp:omemo:2` namespace.
-
-    This implementation models the session type as a simple storage type.
+    :class:`~omemo.session.Session` implementation as a simple storage type.
     """
 
     def __init__(
@@ -639,9 +634,9 @@ class TwomemoSession(Session):
         bare_jid: str,
         device_id: int,
         initiation: Initiation,
-        key_exchange: TwomemoKeyExchange,
+        key_exchange: KeyExchangeImpl,
         associated_data: bytes,
-        double_ratchet: TwomemoDoubleRatchet,
+        double_ratchet: DoubleRatchetImpl,
         confirmed: bool = False
     ):
         """
@@ -666,7 +661,7 @@ class TwomemoSession(Session):
 
     @property
     def namespace(self) -> str:
-        return "urn:xmpp:omemo:2"
+        return NAMESPACE
 
     @property
     def bare_jid(self) -> str:
@@ -685,7 +680,7 @@ class TwomemoSession(Session):
         return self.__confirmed
 
     @property
-    def key_exchange(self) -> TwomemoKeyExchange:
+    def key_exchange(self) -> KeyExchangeImpl:
         return self.__key_exchange
 
     @property
@@ -706,7 +701,7 @@ class TwomemoSession(Session):
         return self.__associated_data
 
     @property
-    def double_ratchet(self) -> TwomemoDoubleRatchet:
+    def double_ratchet(self) -> DoubleRatchetImpl:
         """
         Returns:
             The Double Ratchet held by this instance.
@@ -751,7 +746,7 @@ class Twomemo(Backend):
 
         self.__storage = storage
 
-    async def __get_state(self) -> TwomemoState:
+    async def __get_state(self) -> StateImpl:
         """
         Returns:
             The loaded or newly created X3DH state.
@@ -762,12 +757,12 @@ class Twomemo(Backend):
                 return cast(x3dh.types.JSONObject, value)
 
             raise TypeError(
-                f"Stored TwomemoState under key /{self.namespace}/x3dh corrupt: not a JSON object: {value}"
+                f"Stored StateImpl under key /{self.namespace}/x3dh corrupt: not a JSON object: {value}"
             )
 
         state, _ = (await self.__storage.load(
             f"/{self.namespace}/x3dh"
-        )).fmap(check_type).fmap(lambda serialized: TwomemoState.from_json(
+        )).fmap(check_type).fmap(lambda serialized: StateImpl.from_json(
             serialized,
             x3dh.IdentityKeyFormat.ED_25519,
             x3dh.HashFunction.SHA_256,
@@ -777,7 +772,7 @@ class Twomemo(Backend):
         if state is None:
             identity_key_pair = await IdentityKeyPair.get(self.__storage)
 
-            state = TwomemoState.create(
+            state = StateImpl.create(
                 x3dh.IdentityKeyFormat.ED_25519,
                 x3dh.HashFunction.SHA_256,
                 "OMEMO X3DH".encode("ASCII"),
@@ -794,15 +789,15 @@ class Twomemo(Backend):
 
     @property
     def namespace(self) -> str:
-        return "urn:xmpp:omemo:2"
+        return NAMESPACE
 
-    async def load_session(self, bare_jid: str, device_id: int) -> Optional[TwomemoSession]:
+    async def load_session(self, bare_jid: str, device_id: int) -> Optional[SessionImpl]:
         def check_type(value: JSONType) -> doubleratchet.types.JSONObject:
             if isinstance(value, dict):
                 return cast(doubleratchet.types.JSONObject, value)
 
             raise TypeError(
-                f"Stored TwomemoDoubleRatchet under key"
+                f"Stored DoubleRatchetImpl under key"
                 f" /{self.namespace}/{bare_jid}/{device_id}/double_ratchet corrupt: not a JSON object:"
                 f" {value}"
             )
@@ -810,15 +805,15 @@ class Twomemo(Backend):
         try:
             double_ratchet = (await self.__storage.load(
                 f"/{self.namespace}/{bare_jid}/{device_id}/double_ratchet"
-            )).fmap(check_type).fmap(lambda serialized: TwomemoDoubleRatchet.from_json(
+            )).fmap(check_type).fmap(lambda serialized: DoubleRatchetImpl.from_json(
                 serialized,
                 diffie_hellman_ratchet_curve25519.DiffieHellmanRatchet,
-                TwomemoRootChainKDF,
-                TwomemoMessageChainKDF,
+                RootChainKDFImpl,
+                MessageChainKDFImpl,
                 b"\x02\x01",
                 self.max_num_per_message_skipped_keys,
                 self.max_num_per_session_skipped_keys,
-                TwomemoAEAD
+                AEADImpl
             )).maybe(None)
         except doubleratchet.InconsistentSerializationException:
             return None
@@ -866,14 +861,14 @@ class Twomemo(Backend):
             bool
         )).from_just()
 
-        return TwomemoSession(bare_jid, device_id, initiation, TwomemoKeyExchange(
+        return SessionImpl(bare_jid, device_id, initiation, KeyExchangeImpl(
             x3dh.Header(identity_key, ephemeral_key, signed_pre_key, pre_key),
             signed_pre_key_id,
             pre_key_id
         ), associated_data, double_ratchet, confirmed)
 
     async def store_session(self, session: Session) -> None:
-        assert isinstance(session, TwomemoSession)
+        assert isinstance(session, SessionImpl)
 
         assert session.key_exchange.header.pre_key is not None
 
@@ -946,9 +941,9 @@ class Twomemo(Backend):
         device_id: int,
         bundle: Bundle,
         plain_key_material: PlainKeyMaterial
-    ) -> Tuple[TwomemoSession, TwomemoEncryptedKeyMaterial]:
-        assert isinstance(bundle, TwomemoBundle)
-        assert isinstance(plain_key_material, TwomemoPlainKeyMaterial)
+    ) -> Tuple[SessionImpl, EncryptedKeyMaterialImpl]:
+        assert isinstance(bundle, BundleImpl)
+        assert isinstance(plain_key_material, PlainKeyMaterialImpl)
 
         try:
             shared_secret, associated_data, header = (await self.__get_state()).get_shared_secret_active(
@@ -959,25 +954,25 @@ class Twomemo(Backend):
 
         assert header.pre_key is not None
 
-        double_ratchet, encrypted_message = TwomemoDoubleRatchet.encrypt_initial_message(
+        double_ratchet, encrypted_message = DoubleRatchetImpl.encrypt_initial_message(
             diffie_hellman_ratchet_curve25519.DiffieHellmanRatchet,
-            TwomemoRootChainKDF,
-            TwomemoMessageChainKDF,
+            RootChainKDFImpl,
+            MessageChainKDFImpl,
             b"\x02\x01",
             self.max_num_per_message_skipped_keys,
             self.max_num_per_session_skipped_keys,
-            TwomemoAEAD,
+            AEADImpl,
             shared_secret,
             bundle.bundle.signed_pre_key,
             plain_key_material.key + plain_key_material.auth_tag,
             associated_data
         )
 
-        session = TwomemoSession(
+        session = SessionImpl(
             bare_jid,
             device_id,
             Initiation.ACTIVE,
-            TwomemoKeyExchange(
+            KeyExchangeImpl(
                 header,
                 (await self.__get_signed_pre_key_ids())[header.signed_pre_key],
                 (await self.__get_pre_key_ids())[header.pre_key]
@@ -986,7 +981,7 @@ class Twomemo(Backend):
             double_ratchet
         )
 
-        encrypted_key_material = TwomemoEncryptedKeyMaterial(bare_jid, device_id, encrypted_message)
+        encrypted_key_material = EncryptedKeyMaterialImpl(bare_jid, device_id, encrypted_message)
 
         return session, encrypted_key_material
 
@@ -996,9 +991,9 @@ class Twomemo(Backend):
         device_id: int,
         key_exchange: KeyExchange,
         encrypted_key_material: EncryptedKeyMaterial
-    ) -> Tuple[TwomemoSession, TwomemoPlainKeyMaterial]:
-        assert isinstance(key_exchange, TwomemoKeyExchange)
-        assert isinstance(encrypted_key_material, TwomemoEncryptedKeyMaterial)
+    ) -> Tuple[SessionImpl, PlainKeyMaterialImpl]:
+        assert isinstance(key_exchange, KeyExchangeImpl)
+        assert isinstance(encrypted_key_material, EncryptedKeyMaterialImpl)
 
         state = await self.__get_state()
 
@@ -1013,7 +1008,7 @@ class Twomemo(Backend):
                 raise KeyExchangeFailed(f"No pre key with id {key_exchange.pre_key_id} known.")
 
             # Update the key exchange information with the filled header
-            key_exchange = TwomemoKeyExchange(
+            key_exchange = KeyExchangeImpl(
                 x3dh.Header(
                     key_exchange.header.identity_key,
                     key_exchange.header.ephemeral_key,
@@ -1032,14 +1027,14 @@ class Twomemo(Backend):
             raise KeyExchangeFailed() from e
 
         try:
-            double_ratchet, decrypted_message = TwomemoDoubleRatchet.decrypt_initial_message(
+            double_ratchet, decrypted_message = DoubleRatchetImpl.decrypt_initial_message(
                 diffie_hellman_ratchet_curve25519.DiffieHellmanRatchet,
-                TwomemoRootChainKDF,
-                TwomemoMessageChainKDF,
+                RootChainKDFImpl,
+                MessageChainKDFImpl,
                 b"\x02\x01",
                 self.max_num_per_message_skipped_keys,
                 self.max_num_per_session_skipped_keys,
-                TwomemoAEAD,
+                AEADImpl,
                 shared_secret,
                 signed_pre_key.priv,
                 encrypted_key_material.encrypted_message,
@@ -1050,7 +1045,7 @@ class Twomemo(Backend):
                 "Decryption of the initial message as part of passive session building failed."
             ) from e
 
-        session = TwomemoSession(
+        session = SessionImpl(
             bare_jid,
             device_id,
             Initiation.PASSIVE,
@@ -1059,11 +1054,11 @@ class Twomemo(Backend):
             double_ratchet
         )
 
-        plain_key_material = TwomemoPlainKeyMaterial(decrypted_message[:32], decrypted_message[32:])
+        plain_key_material = PlainKeyMaterialImpl(decrypted_message[:32], decrypted_message[32:])
 
         return session, plain_key_material
 
-    async def encrypt_plaintext(self, plaintext: bytes) -> Tuple[TwomemoContent, TwomemoPlainKeyMaterial]:
+    async def encrypt_plaintext(self, plaintext: bytes) -> Tuple[ContentImpl, PlainKeyMaterialImpl]:
         # Generate 32 bytes of cryptographically secure random data for the key
         key = secrets.token_bytes(32)
 
@@ -1101,20 +1096,20 @@ class Twomemo(Backend):
         # Truncate the authentication tag to 16 bytes/128 bits
         auth_tag = auth.finalize()[:16]
 
-        return TwomemoContent(ciphertext), TwomemoPlainKeyMaterial(key, auth_tag)
+        return ContentImpl(ciphertext), PlainKeyMaterialImpl(key, auth_tag)
 
-    async def encrypt_empty(self) -> Tuple[TwomemoContent, TwomemoPlainKeyMaterial]:
-        return TwomemoContent.make_empty(), TwomemoPlainKeyMaterial(b"\x00" * 32, b"")
+    async def encrypt_empty(self) -> Tuple[ContentImpl, PlainKeyMaterialImpl]:
+        return ContentImpl.make_empty(), PlainKeyMaterialImpl(b"\x00" * 32, b"")
 
     async def encrypt_key_material(
         self,
         session: Session,
         plain_key_material: PlainKeyMaterial
-    ) -> TwomemoEncryptedKeyMaterial:
-        assert isinstance(session, TwomemoSession)
-        assert isinstance(plain_key_material, TwomemoPlainKeyMaterial)
+    ) -> EncryptedKeyMaterialImpl:
+        assert isinstance(session, SessionImpl)
+        assert isinstance(plain_key_material, PlainKeyMaterialImpl)
 
-        return TwomemoEncryptedKeyMaterial(
+        return EncryptedKeyMaterialImpl(
             session.bare_jid,
             session.device_id,
             session.double_ratchet.encrypt_message(
@@ -1124,8 +1119,8 @@ class Twomemo(Backend):
         )
 
     async def decrypt_plaintext(self, content: Content, plain_key_material: PlainKeyMaterial) -> bytes:
-        assert isinstance(content, TwomemoContent)
-        assert isinstance(plain_key_material, TwomemoPlainKeyMaterial)
+        assert isinstance(content, ContentImpl)
+        assert isinstance(plain_key_material, PlainKeyMaterialImpl)
 
         # Derive 80 bytes from the key using HKDF-SHA-256
         key_material = HKDF(
@@ -1172,9 +1167,9 @@ class Twomemo(Backend):
         self,
         session: Session,
         encrypted_key_material: EncryptedKeyMaterial
-    ) -> TwomemoPlainKeyMaterial:
-        assert isinstance(session, TwomemoSession)
-        assert isinstance(encrypted_key_material, TwomemoEncryptedKeyMaterial)
+    ) -> PlainKeyMaterialImpl:
+        assert isinstance(session, SessionImpl)
+        assert isinstance(encrypted_key_material, EncryptedKeyMaterialImpl)
 
         try:
             decrypted_message = session.double_ratchet.decrypt_message(
@@ -1186,7 +1181,7 @@ class Twomemo(Backend):
 
         session.confirm()
 
-        return TwomemoPlainKeyMaterial(decrypted_message[:32], decrypted_message[32:])
+        return PlainKeyMaterialImpl(decrypted_message[:32], decrypted_message[32:])
 
     async def signed_pre_key_age(self) -> int:
         return (await self.__get_state()).signed_pre_key_age()
@@ -1199,7 +1194,7 @@ class Twomemo(Backend):
         await self.__storage.store(f"/{self.namespace}/x3dh", state.json)
 
     async def hide_pre_key(self, session: Session) -> bool:
-        assert isinstance(session, TwomemoSession)
+        assert isinstance(session, SessionImpl)
 
         assert session.key_exchange.header.pre_key is not None
         assert session.key_exchange.header_filled
@@ -1213,7 +1208,7 @@ class Twomemo(Backend):
         return hidden
 
     async def delete_pre_key(self, session: Session) -> bool:
-        assert isinstance(session, TwomemoSession)
+        assert isinstance(session, SessionImpl)
 
         assert session.key_exchange.header.pre_key is not None
         assert session.key_exchange.header_filled
@@ -1243,10 +1238,10 @@ class Twomemo(Backend):
 
         await self.__storage.store(f"/{self.namespace}/x3dh", state.json)
 
-    async def get_bundle(self, bare_jid: str, device_id: int) -> TwomemoBundle:
+    async def get_bundle(self, bare_jid: str, device_id: int) -> BundleImpl:
         bundle = (await self.__get_state()).bundle
 
-        return TwomemoBundle(
+        return BundleImpl(
             bare_jid,
             device_id,
             bundle,
