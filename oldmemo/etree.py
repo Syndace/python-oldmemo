@@ -9,10 +9,10 @@ try:
 except ImportError as e:
     raise ImportError(
         "Optional dependency xmlschema not found. Please install xmlschema, or install this package using"
-        " `pip install twomemo[xml]`, to use the ElementTree-based XML serialization/parser helpers."
+        " `pip install oldmemo[xml]`, to use the ElementTree-based XML serialization/parser helpers."
     ) from e
 
-from .twomemo import NAMESPACE, BundleImpl, ContentImpl, EncryptedKeyMaterialImpl, KeyExchangeImpl
+from .oldmemo import NAMESPACE, BundleImpl, ContentImpl, EncryptedKeyMaterialImpl, KeyExchangeImpl
 
 
 __all__ = [
@@ -30,8 +30,8 @@ NS = f"{{{NAMESPACE}}}"
 
 DEVICE_LIST_SCHEMA = xmlschema.XMLSchema("""<?xml version='1.0' encoding='UTF-8'?>
 <xs:schema xmlns:xs='http://www.w3.org/2001/XMLSchema'
-           targetNamespace='urn:xmpp:omemo:2'
-           xmlns='urn:xmpp:omemo:2'>
+           targetNamespace='eu.siacs.conversations.axolotl'
+           xmlns='eu.siacs.conversations.axolotl'>
 
     <xs:element name='devices'>
         <xs:complexType>
@@ -54,8 +54,8 @@ DEVICE_LIST_SCHEMA = xmlschema.XMLSchema("""<?xml version='1.0' encoding='UTF-8'
 
 BUNDLE_SCHEMA = xmlschema.XMLSchema("""<?xml version='1.0' encoding='UTF-8'?>
 <xs:schema xmlns:xs='http://www.w3.org/2001/XMLSchema'
-           targetNamespace='urn:xmpp:omemo:2'
-           xmlns='urn:xmpp:omemo:2'>
+           targetNamespace='eu.siacs.conversations.axolotl'
+           xmlns='eu.siacs.conversations.axolotl'>
 
     <xs:element name='bundle'>
         <xs:complexType>
@@ -104,8 +104,8 @@ BUNDLE_SCHEMA = xmlschema.XMLSchema("""<?xml version='1.0' encoding='UTF-8'?>
 
 MESSAGE_SCHEMA = xmlschema.XMLSchema("""<?xml version='1.0' encoding='UTF-8'?>
 <xs:schema xmlns:xs='http://www.w3.org/2001/XMLSchema'
-           targetNamespace='urn:xmpp:omemo:2'
-           xmlns='urn:xmpp:omemo:2'>
+           targetNamespace='eu.siacs.conversations.axolotl'
+           xmlns='eu.siacs.conversations.axolotl'>
 
     <xs:element name='encrypted'>
         <xs:complexType>
