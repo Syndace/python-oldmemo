@@ -3,7 +3,7 @@
 Module: etree
 =============
 
-.. automodule:: twomemo.etree
+.. automodule:: oldmemo.etree
     :members:
     :private-members:
     :undoc-members:

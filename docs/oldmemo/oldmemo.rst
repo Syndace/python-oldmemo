@@ -1,7 +1,7 @@
-Module: twomemo
+Module: oldmemo
 ===============
 
-.. automodule:: twomemo.twomemo
+.. automodule:: oldmemo.oldmemo
     :members:
     :special-members: __init__
     :private-members:

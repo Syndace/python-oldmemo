@@ -13,7 +13,7 @@ import os
 import sys
 
 root_dir_path = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
-sys.path.append(os.path.join(root_dir_path, "twomemo"))
+sys.path.append(os.path.join(root_dir_path, "oldmemo"))
 
 # -- Project information -----------------------------------------------------------------
 
