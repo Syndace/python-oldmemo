@@ -62,6 +62,11 @@ setup(
         "cryptography>=3.3.2",
         "protobuf>=3.12.4"
     ],
+    extras_require={
+        "xml": [
+            "xmlschema>=2.0.1"
+        ]
+    },
     python_requires=">=3.7",
     include_package_data=True,
     zip_safe=False,

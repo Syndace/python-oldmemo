@@ -6,4 +6,4 @@ Backend implementation for `python-omemo <https://github.com/Syndace/python-omem
 .. toctree::
     installation
     getting_started
-    API Documentation <twomemo>
+    API Documentation <twomemo/package>

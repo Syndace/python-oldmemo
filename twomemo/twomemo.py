@@ -1,8 +1,9 @@
 # This import from future (theoretically) enables sphinx_autodoc_typehints to handle type aliases better
 from __future__ import annotations  # pylint: disable=unused-variable
 
+import base64
 import secrets
-from typing import Optional, Tuple, cast
+from typing import Dict, Optional, Tuple, cast
 
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.backends import default_backend
@@ -33,6 +34,7 @@ from omemo.types import JSONType
 # https://github.com/PyCQA/pylint/issues/4987
 from .schema_pb2 import (  # pylint: disable=no-name-in-module
     OMEMOAuthenticatedMessage,
+    OMEMOKeyExchange,
     OMEMOMessage
 )
 
@@ -249,17 +251,28 @@ class TwomemoBundle(Bundle):
     providing OMEMO under the `urn:xmpp:omemo:2` backend.
     """
 
-    def __init__(self, bare_jid: str, device_id: int, bundle: x3dh.Bundle) -> None:
+    def __init__(
+        self,
+        bare_jid: str,
+        device_id: int,
+        bundle: x3dh.Bundle,
+        signed_pre_key_id: int,
+        pre_key_ids: Dict[bytes, int]
+    ) -> None:
         """
         Args:
             bare_jid: The bare JID this bundle belongs to.
             device_id: The device id of the specific device this bundle belongs to.
             bundle: The bundle to store in this instance.
+            signed_pre_key_id: The id of the signed pre key referenced in the bundle.
+            pre_key_ids: A dictionary that maps each pre key referenced in the bundle to its id.
         """
 
         self.__bare_jid = bare_jid
         self.__device_id = device_id
         self.__bundle = bundle
+        self.__signed_pre_key_id = signed_pre_key_id
+        self.__pre_key_ids = dict(pre_key_ids)
 
     @property
     def namespace(self) -> str:
@@ -283,12 +296,20 @@ class TwomemoBundle(Bundle):
                 other.bare_jid == self.bare_jid
                 and other.device_id == self.device_id
                 and other.bundle == self.bundle
+                and other.signed_pre_key_id == self.signed_pre_key_id
+                and other.pre_key_ids == self.pre_key_ids
             )
 
         return False
 
     def __hash__(self) -> int:
-        return hash((self.bare_jid, self.device_id, self.bundle))
+        return hash((
+            self.bare_jid,
+            self.device_id,
+            self.bundle,
+            self.signed_pre_key_id,
+            frozenset(self.pre_key_ids.items())
+        ))
 
     @property
     def bundle(self) -> x3dh.Bundle:
@@ -298,6 +319,24 @@ class TwomemoBundle(Bundle):
         """
 
         return self.__bundle
+
+    @property
+    def signed_pre_key_id(self) -> int:
+        """
+        Returns:
+            The id of the signed pre key referenced in the bundle.
+        """
+
+        return self.__signed_pre_key_id
+
+    @property
+    def pre_key_ids(self) -> Dict[bytes, int]:
+        """
+        Returns:
+            A dictionary that maps each pre key referenced in the bundle to its id.
+        """
+
+        return dict(self.__pre_key_ids)
 
 
 class TwomemoContent(Content):
@@ -316,6 +355,16 @@ class TwomemoContent(Content):
         """
 
         self.__ciphertext = ciphertext
+
+    @staticmethod
+    def make_empty() -> TwomemoContent:
+        """
+        Returns:
+            An "empty" instance, i.e. one that corresponds to an empty OMEMO message as per the specification.
+            The ciphertext stored in empty instances is a byte string of zero length.
+        """
+
+        return TwomemoContent(b"")
 
     @property
     def ciphertext(self) -> bytes:
@@ -376,6 +425,41 @@ class TwomemoEncryptedKeyMaterial(EncryptedKeyMaterial):
 
         return self.__encrypted_message
 
+    def serialize(self) -> bytes:
+        """
+        Returns:
+            A serialized OMEMOAuthenticatedMessage message structure representing the content of this
+            instance.
+        """
+
+        # The ciphertext field contains the result of :meth:`TwomemoAEAD.encrypt`, which is a serialized
+        # OMEMOAuthenticatedMessage with all fields already correctly set, thus it can be used here as is.
+        return self.__encrypted_message.ciphertext
+
+    @staticmethod
+    def parse(authenticated_message: bytes, bare_jid: str, device_id: int) -> TwomemoEncryptedKeyMaterial:
+        """
+        Args:
+            authenticated_message: A serialized OMEMOAuthenticatedMessage message structure.
+            bare_jid: The bare JID of the other party.
+            device_id: The device id of the specific device of the other party.
+
+        Returns:
+            An instance of this class, parsed from the OMEMOAuthenticatedMessage.
+        """
+
+        # Parse the OMEMOAuthenticatedMessage and OMEMOMessage structures to extract the header.
+        message = OMEMOMessage.FromString(OMEMOAuthenticatedMessage.FromString(authenticated_message).message)
+
+        return TwomemoEncryptedKeyMaterial(
+            bare_jid,
+            device_id,
+            doubleratchet.EncryptedMessage(
+                doubleratchet.Header(message.dh_pub, message.pn, message.n),
+                authenticated_message
+            )
+        )
+
 
 class TwomemoPlainKeyMaterial(PlainKeyMaterial):
     """
@@ -431,13 +515,17 @@ class TwomemoKeyExchange(KeyExchange):
     providing OMEMO under the `urn:xmpp:omemo:2` backend.
     """
 
-    def __init__(self, header: x3dh.Header) -> None:
+    def __init__(self, header: x3dh.Header, signed_pre_key_id: int, pre_key_id: int) -> None:
         """
         Args:
             header: The header to store in this instance.
+            signed_pre_key_id: The id of the signed pre key referenced in the header.
+            pre_key_id: The id of the pre key referenced in the header.
         """
 
         self.__header = header
+        self.__signed_pre_key_id = signed_pre_key_id
+        self.__pre_key_id = pre_key_id
 
     @property
     def identity_key(self) -> bytes:
@@ -445,12 +533,16 @@ class TwomemoKeyExchange(KeyExchange):
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, TwomemoKeyExchange):
-            return other.header == self.header
+            return (
+                other.header == self.header
+                and other.signed_pre_key_id == self.signed_pre_key_id
+                and other.pre_key_id == self.pre_key_id
+            )
 
         return False
 
     def __hash__(self) -> int:
-        return hash(self.header)
+        return hash((self.header, self.signed_pre_key_id, self.pre_key_id))
 
     @property
     def header(self) -> x3dh.Header:
@@ -460,6 +552,78 @@ class TwomemoKeyExchange(KeyExchange):
         """
 
         return self.__header
+
+    @property
+    def signed_pre_key_id(self) -> int:
+        """
+        Returns:
+            The id of the signed pre key referenced in the header.
+        """
+
+        return self.__signed_pre_key_id
+
+    @property
+    def pre_key_id(self) -> int:
+        """
+        Returns:
+            The id of the pre key referenced in the header.
+        """
+
+        return self.__pre_key_id
+
+    @property
+    def header_filled(self) -> bool:
+        """
+        Returns:
+            Whether the header stored in this instance is filled, i.e. whether the signed pre key and pre key
+            are available in addition to just their ids.
+        """
+
+        return not (self.__header.signed_pre_key == b"" or self.__header.pre_key == b"")
+
+    def serialize(self, authenticated_message: bytes) -> bytes:
+        """
+        Args:
+            authenticated_message: The serialized OMEMOAuthenticatedMessage message structure to include with
+                the key exchange information.
+
+        Returns:
+            A serialized OMEMOKeyExchange message structure representing the content of this instance.
+        """
+
+        return OMEMOKeyExchange(
+            pk_id=self.__pre_key_id,
+            spk_id=self.__signed_pre_key_id,
+            ik=self.__header.identity_key,
+            ek=self.__header.ephemeral_key,
+            message=OMEMOAuthenticatedMessage.FromString(authenticated_message)
+        ).SerializeToString(True)
+
+    @staticmethod
+    def parse(key_exchange: bytes) -> Tuple[TwomemoKeyExchange, bytes]:
+        """
+        Args:
+            key_exchange: A serialized OMEMOKeyExchange message structure.
+
+        Returns:
+            An instance of this class, parsed from the OMEMOKeyExchange, and the serialized
+            OMEMOAuthenticatedMessage extracted from the OMEMOKeyExchange.
+
+        Warning:
+            The OMEMOKeyExchange message structure only contains the ids of the signed pre key and the pre key
+            used for the key exchange, not the full public keys. Since the job of this method is just parsing,
+            the X3DH header is initialized without the public keys here, and the code using instances of this
+            class has to handle the public key lookup from the ids. Use :attr:`header_filled` to check whether
+            the header is filled with the public keys.
+        """
+
+        parsed = OMEMOKeyExchange.FromString(key_exchange)
+
+        return TwomemoKeyExchange(
+            x3dh.Header(parsed.ik, parsed.ek, b"", b""),
+            parsed.spk_id,
+            parsed.pk_id
+        ), parsed.message.SerializeToString(True)
 
 
 class TwomemoSession(Session):
@@ -679,9 +843,19 @@ class Twomemo(Backend):
             f"/{self.namespace}/{bare_jid}/{device_id}/key_exchange/signed_pre_key"
         )).from_just()
 
+        signed_pre_key_id = (await self.__storage.load_primitive(
+            f"/{self.namespace}/{bare_jid}/{device_id}/key_exchange/signed_pre_key_id",
+            int
+        )).from_just()
+
         pre_key = (await self.__storage.load_bytes(
             f"/{self.namespace}/{bare_jid}/{device_id}/key_exchange/pre_key"
-        )).maybe(None)
+        )).from_just()
+
+        pre_key_id = (await self.__storage.load_primitive(
+            f"/{self.namespace}/{bare_jid}/{device_id}/key_exchange/pre_key_id",
+            int
+        )).from_just()
 
         associated_data = (await self.__storage.load_bytes(
             f"/{self.namespace}/{bare_jid}/{device_id}/associated_data"
@@ -693,11 +867,15 @@ class Twomemo(Backend):
         )).from_just()
 
         return TwomemoSession(bare_jid, device_id, initiation, TwomemoKeyExchange(
-            x3dh.Header(identity_key, ephemeral_key, signed_pre_key, pre_key)
+            x3dh.Header(identity_key, ephemeral_key, signed_pre_key, pre_key),
+            signed_pre_key_id,
+            pre_key_id
         ), associated_data, double_ratchet, confirmed)
 
     async def store_session(self, session: Session) -> None:
         assert isinstance(session, TwomemoSession)
+
+        assert session.key_exchange.header.pre_key is not None
 
         await self.__storage.store(
             f"/{self.namespace}/{session.bare_jid}/{session.device_id}/initiation",
@@ -719,15 +897,20 @@ class Twomemo(Backend):
             session.key_exchange.header.signed_pre_key
         )
 
-        if session.key_exchange.header.pre_key is None:
-            await self.__storage.delete(
-                f"/{self.namespace}/{session.bare_jid}/{session.device_id}/key_exchange/pre_key"
-            )
-        else:
-            await self.__storage.store_bytes(
-                f"/{self.namespace}/{session.bare_jid}/{session.device_id}/key_exchange/pre_key",
-                session.key_exchange.header.pre_key
-            )
+        await self.__storage.store(
+            f"/{self.namespace}/{session.bare_jid}/{session.device_id}/key_exchange/signed_pre_key_id",
+            session.key_exchange.signed_pre_key_id
+        )
+
+        await self.__storage.store_bytes(
+            f"/{self.namespace}/{session.bare_jid}/{session.device_id}/key_exchange/pre_key",
+            session.key_exchange.header.pre_key
+        )
+
+        await self.__storage.store(
+            f"/{self.namespace}/{session.bare_jid}/{session.device_id}/key_exchange/pre_key_id",
+            session.key_exchange.pre_key_id
+        )
 
         await self.__storage.store_bytes(
             f"/{self.namespace}/{session.bare_jid}/{session.device_id}/associated_data",
@@ -745,17 +928,17 @@ class Twomemo(Backend):
         )
 
         # Keep track of bare JIDs with stored sessions
-        bare_jids = set((await self.__storage.load_list(f"/{self.namespace}", str)).maybe([]))
+        bare_jids = set((await self.__storage.load_list(f"/{self.namespace}/bare_jids", str)).maybe([]))
         bare_jids.add(session.bare_jid)
-        await self.__storage.store(f"/{self.namespace}", list(bare_jids))
+        await self.__storage.store(f"/{self.namespace}/bare_jids", list(bare_jids))
 
         # Keep track of device ids with stored sessions
         device_ids = set((await self.__storage.load_list(
-            f"/{self.namespace}/{session.bare_jid}",
+            f"/{self.namespace}/{session.bare_jid}/device_ids",
             int
         )).maybe([]))
         device_ids.add(session.device_id)
-        await self.__storage.store(f"/{self.namespace}/{session.bare_jid}", list(device_ids))
+        await self.__storage.store(f"/{self.namespace}/{session.bare_jid}/device_ids", list(device_ids))
 
     async def build_session_active(
         self,
@@ -773,6 +956,8 @@ class Twomemo(Backend):
             )
         except x3dh.KeyAgreementException as e:
             raise KeyExchangeFailed() from e
+
+        assert header.pre_key is not None
 
         double_ratchet, encrypted_message = TwomemoDoubleRatchet.encrypt_initial_message(
             diffie_hellman_ratchet_curve25519.DiffieHellmanRatchet,
@@ -792,7 +977,11 @@ class Twomemo(Backend):
             bare_jid,
             device_id,
             Initiation.ACTIVE,
-            TwomemoKeyExchange(header),
+            TwomemoKeyExchange(
+                header,
+                (await self.__get_signed_pre_key_ids())[header.signed_pre_key],
+                (await self.__get_pre_key_ids())[header.pre_key]
+            ),
             associated_data,
             double_ratchet
         )
@@ -812,6 +1001,28 @@ class Twomemo(Backend):
         assert isinstance(encrypted_key_material, TwomemoEncryptedKeyMaterial)
 
         state = await self.__get_state()
+
+        if not key_exchange.header_filled:
+            # Perform lookup of the signed pre key and pre key public keys in case the header is not filled
+            signed_pre_keys_by_id = { v: k for k, v in (await self.__get_signed_pre_key_ids()).items() }
+            if key_exchange.signed_pre_key_id not in signed_pre_keys_by_id:
+                raise KeyExchangeFailed(f"No signed pre key with id {key_exchange.signed_pre_key_id} known.")
+
+            pre_keys_by_id = { v: k for k, v in (await self.__get_pre_key_ids()).items() }
+            if key_exchange.pre_key_id not in pre_keys_by_id:
+                raise KeyExchangeFailed(f"No pre key with id {key_exchange.pre_key_id} known.")
+
+            # Update the key exchange information with the filled header
+            key_exchange = TwomemoKeyExchange(
+                x3dh.Header(
+                    key_exchange.header.identity_key,
+                    key_exchange.header.ephemeral_key,
+                    signed_pre_keys_by_id[key_exchange.signed_pre_key_id],
+                    pre_keys_by_id[key_exchange.pre_key_id]
+                ),
+                key_exchange.signed_pre_key_id,
+                key_exchange.pre_key_id
+            )
 
         try:
             shared_secret, associated_data, signed_pre_key = state.get_shared_secret_passive(
@@ -893,7 +1104,7 @@ class Twomemo(Backend):
         return TwomemoContent(ciphertext), TwomemoPlainKeyMaterial(key, auth_tag)
 
     async def encrypt_empty(self) -> Tuple[TwomemoContent, TwomemoPlainKeyMaterial]:
-        return TwomemoContent(b""), TwomemoPlainKeyMaterial(b"\x00" * 32, b"")
+        return TwomemoContent.make_empty(), TwomemoPlainKeyMaterial(b"\x00" * 32, b"")
 
     async def encrypt_key_material(
         self,
@@ -990,28 +1201,28 @@ class Twomemo(Backend):
     async def hide_pre_key(self, session: Session) -> bool:
         assert isinstance(session, TwomemoSession)
 
-        hidden = False
+        assert session.key_exchange.header.pre_key is not None
+        assert session.key_exchange.header_filled
 
-        if session.key_exchange.header.pre_key is not None:
-            state = await self.__get_state()
+        state = await self.__get_state()
 
-            hidden = state.hide_pre_key(session.key_exchange.header.pre_key)
+        hidden = state.hide_pre_key(session.key_exchange.header.pre_key)
 
-            await self.__storage.store(f"/{self.namespace}/x3dh", state.json)
+        await self.__storage.store(f"/{self.namespace}/x3dh", state.json)
 
         return hidden
 
     async def delete_pre_key(self, session: Session) -> bool:
         assert isinstance(session, TwomemoSession)
 
-        deleted = False
+        assert session.key_exchange.header.pre_key is not None
+        assert session.key_exchange.header_filled
 
-        if session.key_exchange.header.pre_key is not None:
-            state = await self.__get_state()
+        state = await self.__get_state()
 
-            deleted = state.delete_pre_key(session.key_exchange.header.pre_key)
+        deleted = state.delete_pre_key(session.key_exchange.header.pre_key)
 
-            await self.__storage.store(f"/{self.namespace}/x3dh", state.json)
+        await self.__storage.store(f"/{self.namespace}/x3dh", state.json)
 
         return deleted
 
@@ -1033,30 +1244,154 @@ class Twomemo(Backend):
         await self.__storage.store(f"/{self.namespace}/x3dh", state.json)
 
     async def get_bundle(self, bare_jid: str, device_id: int) -> TwomemoBundle:
-        return TwomemoBundle(bare_jid, device_id, (await self.__get_state()).bundle)
+        bundle = (await self.__get_state()).bundle
+
+        return TwomemoBundle(
+            bare_jid,
+            device_id,
+            bundle,
+            (await self.__get_signed_pre_key_ids())[bundle.signed_pre_key],
+            {
+                pre_key: pre_key_id
+                for pre_key, pre_key_id
+                in (await self.__get_pre_key_ids()).items()
+                if pre_key in bundle.pre_keys
+            }
+        )
 
     async def purge(self) -> None:
-        for bare_jid in (await self.__storage.load_list(f"/{self.namespace}", str)).maybe([]):
+        for bare_jid in (await self.__storage.load_list(f"/{self.namespace}/bare_jids", str)).maybe([]):
             await self.purge_bare_jid(bare_jid)
 
-        await self.__storage.delete(f"/{self.namespace}")
+        await self.__storage.delete(f"/{self.namespace}/bare_jids")
         await self.__storage.delete(f"/{self.namespace}/x3dh")
+        await self.__storage.delete(f"/{self.namespace}/signed_pre_key_ids")
+        await self.__storage.delete(f"/{self.namespace}/pre_key_ids")
+        await self.__storage.delete(f"/{self.namespace}/pre_key_id_counter")
 
     async def purge_bare_jid(self, bare_jid: str) -> None:
         storage = self.__storage
 
-        for device_id in (await storage.load_list(f"/{self.namespace}/{bare_jid}", int)).maybe([]):
+        for device_id in (await storage.load_list(f"/{self.namespace}/{bare_jid}/device_ids", int)).maybe([]):
             await storage.delete(f"/{self.namespace}/{bare_jid}/{device_id}/initiation")
             await storage.delete(f"/{self.namespace}/{bare_jid}/{device_id}/key_exchange/identity_key")
             await storage.delete(f"/{self.namespace}/{bare_jid}/{device_id}/key_exchange/ephemeral_key")
             await storage.delete(f"/{self.namespace}/{bare_jid}/{device_id}/key_exchange/signed_pre_key")
+            await storage.delete(f"/{self.namespace}/{bare_jid}/{device_id}/key_exchange/signed_pre_key_id")
             await storage.delete(f"/{self.namespace}/{bare_jid}/{device_id}/key_exchange/pre_key")
+            await storage.delete(f"/{self.namespace}/{bare_jid}/{device_id}/key_exchange/pre_key_id")
             await storage.delete(f"/{self.namespace}/{bare_jid}/{device_id}/associated_data")
             await storage.delete(f"/{self.namespace}/{bare_jid}/{device_id}/double_ratchet")
             await storage.delete(f"/{self.namespace}/{bare_jid}/{device_id}/confirmed")
 
-        await storage.delete(f"/{self.namespace}/{bare_jid}")
+        await storage.delete(f"/{self.namespace}/{bare_jid}/device_ids")
 
-        bare_jids = set((await storage.load_list(f"/{self.namespace}", str)).maybe([]))
+        bare_jids = set((await storage.load_list(f"/{self.namespace}/bare_jids", str)).maybe([]))
         bare_jids.remove(bare_jid)
-        await storage.store(f"/{self.namespace}", list(bare_jids))
+        await storage.store(f"/{self.namespace}/bare_jids", list(bare_jids))
+
+    async def __get_signed_pre_key_ids(self) -> Dict[bytes, int]:
+        """
+        Assigns an id to each signed pre key currently available in the X3DH state, both the current signed
+        pre key and the old signed pre key that is kept around for one more rotation period. Once assigned to
+        a signed pre key, its id will never change.
+
+        Returns:
+            The mapping from signed pre key to id.
+        """
+
+        state = await self.__get_state()
+
+        signed_pre_key = state.bundle.signed_pre_key
+        old_signed_pre_key = state.old_signed_pre_key
+
+        # Load the existing signed pre key ids from the storage
+        signed_pre_key_ids = {
+            base64.b64decode(signed_pre_key_b64): signed_pre_key_id
+            for signed_pre_key_b64, signed_pre_key_id
+            in (await self.__storage.load_dict(
+                f"/{self.namespace}/signed_pre_key_ids",
+                int
+            )).maybe({}).items()
+        }
+
+        # Take note of the highest id that was assigned, default to 0 if no ids were assigned yet
+        signed_pre_key_id_counter = max(
+            signed_pre_key_id
+            for _, signed_pre_key_id
+            in signed_pre_key_ids
+        ) if len(signed_pre_key_ids) > 0 else 0
+
+        # Prepare the dictionary to hold updated signed pre key ids
+        new_signed_pre_key_ids: Dict[bytes, int] = {}
+
+        # Assign the next highest id to the signed pre key, if there is no id assigned to it yet.
+        new_signed_pre_key_ids[signed_pre_key] = signed_pre_key_ids.get(
+            signed_pre_key,
+            signed_pre_key_id_counter := signed_pre_key_id_counter + 1
+        )
+
+        # Assign the next highest id to the old signed pre key, if there is no id assigned to it yet. This
+        # should never happen, since the old signed pre key should have been assigned an id when it was the
+        # (non-old) signed pre key, however there might be edge cases of the signed pre key rotating twice
+        # before the assigned ids are updated.
+        if old_signed_pre_key is not None:
+            new_signed_pre_key_ids[old_signed_pre_key] = signed_pre_key_ids.get(
+                old_signed_pre_key,
+                signed_pre_key_id_counter := signed_pre_key_id_counter + 1
+            )
+
+        # If the ids have changed, store them
+        if new_signed_pre_key_ids != signed_pre_key_ids:
+            await self.__storage.store(f"/{self.namespace}/signed_pre_key_ids", {
+                base64.b64encode(signed_pre_key).decode("ASCII"): signed_pre_key_id
+                for signed_pre_key, signed_pre_key_id
+                in new_signed_pre_key_ids.items()
+            })
+
+        return new_signed_pre_key_ids
+
+    async def __get_pre_key_ids(self) -> Dict[bytes, int]:
+        """
+        Assigns an id to each pre key currently available in the X3DH state, both hidden and visible pre keys.
+        Once assigned to a pre key, its id will never change.
+
+        Returns:
+            The mapping from pre key to id.
+        """
+
+        state = await self.__get_state()
+
+        pre_keys = state.bundle.pre_keys | state.hidden_pre_keys
+
+        # Load the existing pre key ids from the storage
+        pre_key_ids = {
+            base64.b64decode(pre_key_b64): pre_key_id
+            for pre_key_b64, pre_key_id
+            in (await self.__storage.load_dict(f"/{self.namespace}/pre_key_ids", int)).maybe({}).items()
+        }
+
+        # Load the pre key id counter from the storage
+        pre_key_id_counter = (await self.__storage.load_primitive(
+            f"/{self.namespace}/pre_key_id_counter",
+            int
+        )).maybe(0)
+
+        # Prepare the dictionary to hold updated pre key ids
+        new_pre_key_ids: Dict[bytes, int] = {}
+
+        # Assign the next highest id to each pre key if there is no existing id assigned to it
+        for pre_key in pre_keys:
+            new_pre_key_ids[pre_key] = pre_key_ids.get(pre_key, pre_key_id_counter := pre_key_id_counter + 1)
+
+        # If the ids have changed, store them
+        if new_pre_key_ids != pre_key_ids:
+            await self.__storage.store(f"/{self.namespace}/pre_key_ids", {
+                base64.b64encode(pre_key).decode("ASCII"): pre_key_id
+                for pre_key, pre_key_id
+                in new_pre_key_ids.items()
+            })
+
+            await self.__storage.store(f"/{self.namespace}/pre_key_id_counter", pre_key_id_counter)
+
+        return new_pre_key_ids

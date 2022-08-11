@@ -2,3 +2,4 @@ OMEMO>=1.0.0,<2
 DoubleRatchet>=1.0.0,<2
 cryptography>=3.3.2
 protobuf>=3.12.4
+xmlschema>=2.0.1
