@@ -33,8 +33,8 @@ jobs:
       run: pip install --upgrade mypy pylint flake8 mypy-protobuf types-protobuf
 
     - name: Type-check using mypy
-      run: mypy --strict twomemo/ setup.py
+      run: mypy --strict oldmemo/ setup.py
     - name: Lint using pylint
-      run: pylint twomemo/ setup.py
+      run: pylint oldmemo/ setup.py
     - name: Format-check using Flake8
-      run: flake8 twomemo/ setup.py
+      run: flake8 oldmemo/ setup.py

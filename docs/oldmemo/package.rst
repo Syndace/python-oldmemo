@@ -1,6 +1,6 @@
-Package: twomemo
+Package: oldmemo
 ================
 
 .. toctree::
     Module: etree <etree>
-    Module: twomemo <twomemo>
+    Module: oldmemo <oldmemo>
