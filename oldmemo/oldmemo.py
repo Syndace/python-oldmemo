@@ -27,7 +27,7 @@ from omemo.storage import Storage
 from omemo.types import JSONType
 
 # https://github.com/PyCQA/pylint/issues/4987
-from .twomemo_pb2 import (  # pylint: disable=no-name-in-module
+from .oldmemo_pb2 import (  # pylint: disable=no-name-in-module
     OMEMOAuthenticatedMessage,
     OMEMOKeyExchange,
     OMEMOMessage
@@ -35,7 +35,7 @@ from .twomemo_pb2 import (  # pylint: disable=no-name-in-module
 
 
 __all__ = [
-    "Twomemo",
+    "Oldmemo",
     "NAMESPACE",
     "AEADImpl",
     "BundleImpl",
@@ -51,7 +51,7 @@ __all__ = [
 ]
 
 
-NAMESPACE: Final = "urn:xmpp:omemo:2"
+NAMESPACE: Final = "eu.siacs.conversations.axolotl"
 
 
 class RootChainKDFImpl(kdf_hkdf.KDF):
@@ -737,9 +737,10 @@ class SessionImpl(Session):
         self.__confirmed = True
 
 
-class Twomemo(Backend):
+class Oldmemo(Backend):
     """
-    :class:`~omemo.backend.Backend` implementation providing OMEMO in the `urn:xmpp:omemo:2` namespace.
+    :class:`~omemo.backend.Backend` implementation providing OMEMO in the `eu.siacs.conversations.axolotl`
+    namespace.
     """
 
     def __init__(
