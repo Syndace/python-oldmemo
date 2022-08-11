@@ -4,7 +4,7 @@ from typing import Dict, Union, List
 
 from setuptools import setup, find_packages  # type: ignore[import-untyped]
 
-source_root = os.path.join(os.path.dirname(os.path.abspath(__file__)), "twomemo")
+source_root = os.path.join(os.path.dirname(os.path.abspath(__file__)), "oldmemo")
 
 version_scope: Dict[str, Dict[str, str]] = {}
 with open(os.path.join(source_root, "version.py"), encoding="utf-8") as f:

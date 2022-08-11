@@ -1,7 +1,7 @@
 from .version import __version__
 from .project import project
 
-from .twomemo import Twomemo
+from .oldmemo import Oldmemo
 
 # Fun:
 # https://github.com/PyCQA/pylint/issues/6006
@@ -13,6 +13,6 @@ __all__ = [  # pylint: disable=unused-variable
     # .project
     "project",
 
-    # .twomemo
-    "Twomemo"
+    # .oldmemo
+    "Oldmemo"
 ]
