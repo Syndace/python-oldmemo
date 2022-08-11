@@ -13,7 +13,7 @@ import os
 import sys
 
 this_file_path = os.path.dirname(os.path.abspath(__file__))
-sys.path.append(os.path.join(this_file_path, "..", "twomemo"))
+sys.path.append(os.path.join(this_file_path, "..", "oldmemo"))
 
 from version import __version__ as __version
 from project import project     as __project
