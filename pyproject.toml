@@ -3,8 +3,8 @@ requires = [ "setuptools" ]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "Twomemo"
-description = "Backend implementation of the namespace `urn:xmpp:omemo:2` for python-omemo."
+name = "Oldmemo"
+description = "Backend implementation of the namespace `eu.siacs.conversations.axolotl` for python-omemo."
 readme = "README.md"
 dynamic = [ "version" ]
 authors = [
@@ -43,10 +43,10 @@ classifiers = [
 ]
 
 [tool.setuptools.dynamic]
-version = { attr = "twomemo.version.__version__" }
+version = { attr = "oldmemo.version.__version__" }
 
 [tool.setuptools.packages.find]
-include = [ "twomemo", "twomemo.*" ]
+include = [ "oldmemo", "oldmemo.*" ]
 namespaces = false
 
 [project.optional-dependencies]
@@ -54,13 +54,13 @@ xml = [
     "xmlschema>=2.0.2"
 ]
 docs = [
-    "twomemo[xml]",
+    "oldmemo[xml]",
     "sphinx",
     "sphinx-rtd-theme",
     "sphinx-autodoc-typehints"
 ]
 lint = [
-    "twomemo[xml]",
+    "oldmemo[xml]",
     "mypy",
     "types-protobuf",
     "pylint",
@@ -68,15 +68,15 @@ lint = [
     "flake8-pyproject"
 ]
 dev = [
-    "twomemo[xml,docs,lint]",
+    "oldmemo[xml,docs,lint]",
     "mypy-protobuf"
 ]
 
 [project.urls]
-Documentation = "https://python-twomemo.readthedocs.io/"
-Repository = "https://github.com/Syndace/python-twomemo"
-Issues = "https://github.com/Syndace/python-twomemo/issues"
-Changelog = "https://github.com/Syndace/python-twomemo/blob/main/CHANGELOG.md"
+Documentation = "https://python-oldmemo.readthedocs.io/"
+Repository = "https://github.com/Syndace/python-oldmemo"
+Issues = "https://github.com/Syndace/python-oldmemo/issues"
+Changelog = "https://github.com/Syndace/python-oldmemo/blob/main/CHANGELOG.md"
 
 [tool.mypy]
 strict = true
@@ -87,5 +87,5 @@ doctests = true
 ignore = [ "E201", "E202", "W503" ]
 exclude = "*_pb2.py"
 per-file-ignores = [
-    "twomemo/__init__.py:F401"
+    "oldmemo/__init__.py:F401"
 ]
