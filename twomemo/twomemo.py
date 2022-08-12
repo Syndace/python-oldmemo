@@ -92,6 +92,8 @@ class AEADImpl(aead_aes_hmac.AEAD):
     associated data.
     """
 
+    AUTHENTICATION_TAG_TRUNCATED_LENGTH = 16
+
     @staticmethod
     def _get_hash_function() -> HashFunction:
         return HashFunction.SHA_256
@@ -134,10 +136,10 @@ class AEADImpl(aead_aes_hmac.AEAD):
         auth = hmac.HMAC(authentication_key, hash_function, backend=default_backend())
         auth.update(associated_data + omemo_message)
 
-        # Truncate the authentication tag to 16 bytes/128 bits and serialize it with the OMEMOMessage in an
-        # OMEMOAuthenticatedMessage.
+        # Truncate the authentication tag to AUTHENTICATION_TAG_TRUNCATED_LENGTH bytes and serialize it with
+        # the OMEMOMessage in an OMEMOAuthenticatedMessage.
         return OMEMOAuthenticatedMessage(
-            mac=auth.finalize()[:16],
+            mac=auth.finalize()[:AEADImpl.AUTHENTICATION_TAG_TRUNCATED_LENGTH],
             message=omemo_message
         ).SerializeToString(True)
 
@@ -220,7 +222,11 @@ class AEADImpl(aead_aes_hmac.AEAD):
             The original associated data and the header used to build it.
         """
 
-        associated_data, omemo_message = associated_data[:64], OMEMOMessage.FromString(associated_data[64:])
+        associated_data_length = StateImpl.IDENTITY_KEY_ENCODING_LENGTH * 2
+
+        omemo_message = OMEMOMessage.FromString(associated_data[associated_data_length:])
+        associated_data = associated_data[:associated_data_length]
+
         return associated_data, doubleratchet.Header(omemo_message.dh_pub, omemo_message.pn, omemo_message.n)
 
 
@@ -228,6 +234,8 @@ class DoubleRatchetImpl(doubleratchet.DoubleRatchet):
     """
     The Double Ratchet implementation used by this version of the specification.
     """
+
+    MESSAGE_CHAIN_CONSTANT = b"\x02\x01"
 
     @staticmethod
     def _build_associated_data(associated_data: bytes, header: doubleratchet.Header) -> bytes:
@@ -242,6 +250,9 @@ class StateImpl(x3dh.BaseState):
     """
     The X3DH state implementation used by this version of the specification.
     """
+
+    INFO = "OMEMO X3DH".encode("ASCII")
+    IDENTITY_KEY_ENCODING_LENGTH = 32
 
     @staticmethod
     def _encode_public_key(key_format: x3dh.IdentityKeyFormat, pub: bytes) -> bytes:
@@ -466,6 +477,8 @@ class PlainKeyMaterialImpl(PlainKeyMaterial):
     :class:`~omemo.message.PlainKeyMaterial` implementation as a simple storage type.
     """
 
+    KEY_LENGTH = 32
+
     def __init__(self, key: bytes, auth_tag: bytes) -> None:
         """
         Args:
@@ -473,8 +486,8 @@ class PlainKeyMaterialImpl(PlainKeyMaterial):
             auth_tag: The authentication tag to store in this instance.
 
         Note:
-            For empty OMEMO messages as per the specification, the key is set to 32 zero-bytes, and the auth
-            tag is set to an empty byte string.
+            For empty OMEMO messages as per the specification, the key is set to :attr:`KEY_LENGTH`
+            zero-bytes, and the auth tag is set to an empty byte string.
         """
 
         self.__key = key
@@ -505,7 +518,7 @@ class PlainKeyMaterialImpl(PlainKeyMaterial):
             Whether this instance corresponds to an empty OMEMO message.
         """
 
-        return self.__key == b"\x00" * 32 and self.__auth_tag == b""
+        return self.__key == b"\x00" * PlainKeyMaterialImpl.KEY_LENGTH and self.__auth_tag == b""
 
 
 class KeyExchangeImpl(KeyExchange):
@@ -766,7 +779,7 @@ class Twomemo(Backend):
             serialized,
             x3dh.IdentityKeyFormat.ED_25519,
             x3dh.HashFunction.SHA_256,
-            "OMEMO X3DH".encode("ASCII")
+            StateImpl.INFO
         )).maybe((None, False))
 
         if state is None:
@@ -775,7 +788,7 @@ class Twomemo(Backend):
             state = StateImpl.create(
                 x3dh.IdentityKeyFormat.ED_25519,
                 x3dh.HashFunction.SHA_256,
-                "OMEMO X3DH".encode("ASCII"),
+                StateImpl.INFO,
                 (
                     x3dh.identity_key_pair.IdentityKeyPairSeed(identity_key_pair.seed)
                     if isinstance(identity_key_pair, IdentityKeyPairSeed)
@@ -810,7 +823,7 @@ class Twomemo(Backend):
                 diffie_hellman_ratchet_curve25519.DiffieHellmanRatchet,
                 RootChainKDFImpl,
                 MessageChainKDFImpl,
-                b"\x02\x01",
+                DoubleRatchetImpl.MESSAGE_CHAIN_CONSTANT,
                 self.max_num_per_message_skipped_keys,
                 self.max_num_per_session_skipped_keys,
                 AEADImpl
@@ -958,7 +971,7 @@ class Twomemo(Backend):
             diffie_hellman_ratchet_curve25519.DiffieHellmanRatchet,
             RootChainKDFImpl,
             MessageChainKDFImpl,
-            b"\x02\x01",
+            DoubleRatchetImpl.MESSAGE_CHAIN_CONSTANT,
             self.max_num_per_message_skipped_keys,
             self.max_num_per_session_skipped_keys,
             AEADImpl,
@@ -1031,7 +1044,7 @@ class Twomemo(Backend):
                 diffie_hellman_ratchet_curve25519.DiffieHellmanRatchet,
                 RootChainKDFImpl,
                 MessageChainKDFImpl,
-                b"\x02\x01",
+                DoubleRatchetImpl.MESSAGE_CHAIN_CONSTANT,
                 self.max_num_per_message_skipped_keys,
                 self.max_num_per_session_skipped_keys,
                 AEADImpl,
@@ -1054,13 +1067,16 @@ class Twomemo(Backend):
             double_ratchet
         )
 
-        plain_key_material = PlainKeyMaterialImpl(decrypted_message[:32], decrypted_message[32:])
+        plain_key_material = PlainKeyMaterialImpl(
+            decrypted_message[:PlainKeyMaterialImpl.KEY_LENGTH],
+            decrypted_message[PlainKeyMaterialImpl.KEY_LENGTH:]
+        )
 
         return session, plain_key_material
 
     async def encrypt_plaintext(self, plaintext: bytes) -> Tuple[ContentImpl, PlainKeyMaterialImpl]:
-        # Generate 32 bytes of cryptographically secure random data for the key
-        key = secrets.token_bytes(32)
+        # Generate KEY_LENGTH bytes of cryptographically secure random data for the key
+        key = secrets.token_bytes(PlainKeyMaterialImpl.KEY_LENGTH)
 
         # Derive 80 bytes from the key using HKDF-SHA-256
         key_material = HKDF(
@@ -1093,13 +1109,13 @@ class Twomemo(Backend):
         auth = hmac.HMAC(authentication_key, hashes.SHA256(), backend=default_backend())
         auth.update(ciphertext)
 
-        # Truncate the authentication tag to 16 bytes/128 bits
-        auth_tag = auth.finalize()[:16]
+        # Truncate the authentication tag to AUTHENTICATION_TAG_TRUNCATED_LENGTH bytes
+        auth_tag = auth.finalize()[:AEADImpl.AUTHENTICATION_TAG_TRUNCATED_LENGTH]
 
         return ContentImpl(ciphertext), PlainKeyMaterialImpl(key, auth_tag)
 
     async def encrypt_empty(self) -> Tuple[ContentImpl, PlainKeyMaterialImpl]:
-        return ContentImpl.make_empty(), PlainKeyMaterialImpl(b"\x00" * 32, b"")
+        return ContentImpl.make_empty(), PlainKeyMaterialImpl(b"\x00" * PlainKeyMaterialImpl.KEY_LENGTH, b"")
 
     async def encrypt_key_material(
         self,
@@ -1181,7 +1197,10 @@ class Twomemo(Backend):
 
         session.confirm()
 
-        return PlainKeyMaterialImpl(decrypted_message[:32], decrypted_message[32:])
+        return PlainKeyMaterialImpl(
+            decrypted_message[:PlainKeyMaterialImpl.KEY_LENGTH],
+            decrypted_message[PlainKeyMaterialImpl.KEY_LENGTH:]
+        )
 
     async def signed_pre_key_age(self) -> int:
         return (await self.__get_state()).signed_pre_key_age()
