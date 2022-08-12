@@ -7,6 +7,8 @@
 
 Backend implementation for [python-omemo](https://github.com/Syndace/python-omemo), equipping python-omemo with support for OMEMO under the namespace `eu.siacs.conversations.axolotl` (casually/jokingly referred to as "oldmemo").
 
+This repository is based on [python-twomemo](https://github.com/Syndace/python-twomemo) and will be rebased on top of new commits to that repository regularly, so expect commit hashes to be unstable.
+
 ## Installation ##
 
 python-oldmemo depends on two system libraries, [libxeddsa](https://github.com/Syndace/libxeddsa)>=2,<3 and [libsodium](https://download.libsodium.org/doc/).
