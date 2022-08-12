@@ -7,6 +7,8 @@
 
 Backend implementation for [python-omemo](https://github.com/Syndace/python-omemo), equipping python-omemo with support for OMEMO under the namespace `eu.siacs.conversations.axolotl` (casually/jokingly referred to as "oldmemo").
 
+This repository is based on [python-twomemo](https://github.com/Syndace/python-twomemo) and will be rebased on top of new commits to that repository regularly, so expect commit hashes to be unstable.
+
 ## Installation ##
 
 Install the latest release using pip (`pip install oldmemo`) or manually from source by running `pip install .` in the cloned repository.
