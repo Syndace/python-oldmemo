@@ -2,22 +2,26 @@ syntax = "proto2";
 
 package oldmemo;
 
+// A modified version of SignalMessage defined in
+// https://github.com/signalapp/libsignal-protocol-java/blob/master/protobuf/WhisperTextProtocol.proto
+// Structure, field names, required/optional and order changed to match python-twomemo. The serialization
+// should not be affected by those modifications.
 message OMEMOMessage {
-    required uint32 n          = 1;
-    required uint32 pn         = 2;
-    required bytes  dh_pub     = 3;
+    required uint32 n          = 2;
+    required uint32 pn         = 3;
+    required bytes  dh_pub     = 1;
     optional bytes  ciphertext = 4;
 }
 
-message OMEMOAuthenticatedMessage {
-    required bytes mac     = 1;
-    required bytes message = 2; // Byte-encoding of an OMEMOMessage
-}
-
+// A modified version of PreKeySignalMessage defined in
+// https://github.com/signalapp/libsignal-protocol-java/blob/master/protobuf/WhisperTextProtocol.proto
+// Structure, field names, required/optional and order changed to match python-twomemo. The serialization
+// should not be affected by those modifications.
 message OMEMOKeyExchange {
-    required uint32 pk_id  = 1;
-    required uint32 spk_id = 2;
-    required bytes  ik     = 3;
-    required bytes  ek     = 4;
-    required OMEMOAuthenticatedMessage message = 5;
+    required uint32 pk_id   = 1;
+    required uint32 spk_id  = 6;
+    required bytes  ik      = 3;
+    required bytes  ek      = 2;
+    required bytes  message = 4; // Byte-encoding of an OMEMOMessage & authentication tag (see OMEMOAuthenticatedMessage in oldmemo/oldmemo.py)
+    optional uint32 unused  = 5;
 }
