@@ -131,7 +131,9 @@ class AEADImpl(aead_aes_hmac.AEAD):
     associated data.
     """
 
-    AUTHENTICATION_TAG_TRUNCATED_LENGTH: Final = 16  # TODO: Check truncation size
+    # https://github.com/signalapp/libsignal-protocol-java/blob/fde96d22004f32a391554e4991e4e1f0a14c2d50/java/
+    # src/main/java/org/whispersystems/libsignal/protocol/SignalMessage.java#L28
+    AUTHENTICATION_TAG_TRUNCATED_LENGTH: Final = 8
 
     @staticmethod
     def _get_hash_function() -> HashFunction:
