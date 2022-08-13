@@ -22,7 +22,7 @@ with open("README.md", encoding="utf-8") as f:
 classifiers = [
     "Intended Audience :: Developers",
 
-    "License :: OSI Approved :: MIT License",
+    "License :: OSI Approved :: GNU Affero General Public License v3",
 
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3 :: Only",
@@ -55,7 +55,7 @@ setup(
     version=version["short"],
     long_description=long_description,
     long_description_content_type="text/markdown",
-    license="MIT",
+    license="AGPLv3",
     packages=find_packages(exclude=["tests"]),
     install_requires=[
         "OMEMO>=1.0.0,<2",
