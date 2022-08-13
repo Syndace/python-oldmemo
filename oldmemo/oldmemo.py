@@ -64,7 +64,9 @@ class RootChainKDFImpl(kdf_hkdf.KDF):
 
     @staticmethod
     def _get_info() -> bytes:
-        return "OMEMO Root Chain".encode("ASCII")
+        # https://github.com/signalapp/libsignal-protocol-java/blob/fde96d22004f32a391554e4991e4e1f0a14c2d50/
+        # java/src/main/java/org/whispersystems/libsignal/ratchet/RootKey.java#L35
+        return "WhisperRatchet".encode("ASCII")
 
 
 class MessageChainKDFImpl(kdf_separate_hmacs.KDF):
@@ -128,7 +130,7 @@ class AEADImpl(aead_aes_hmac.AEAD):
     associated data.
     """
 
-    AUTHENTICATION_TAG_TRUNCATED_LENGTH: Final = 16
+    AUTHENTICATION_TAG_TRUNCATED_LENGTH: Final = 16  # TODO: Check truncation size
 
     @staticmethod
     def _get_hash_function() -> HashFunction:
@@ -136,7 +138,9 @@ class AEADImpl(aead_aes_hmac.AEAD):
 
     @staticmethod
     def _get_info() -> bytes:
-        return "OMEMO Message Key Material".encode("ASCII")
+        # https://github.com/signalapp/libsignal-protocol-java/blob/fde96d22004f32a391554e4991e4e1f0a14c2d50/
+        # java/src/main/java/org/whispersystems/libsignal/ratchet/ChainKey.java#L48
+        return "WhisperMessageKeys".encode("ASCII")
 
     @classmethod
     async def encrypt(cls, plaintext: bytes, key: bytes, associated_data: bytes) -> bytes:
@@ -258,6 +262,8 @@ class DoubleRatchetImpl(doubleratchet.DoubleRatchet):
     The Double Ratchet implementation used by this version of the specification.
     """
 
+    # https://github.com/signalapp/libsignal-protocol-java/blob/fde96d22004f32a391554e4991e4e1f0a14c2d50/java/
+    # src/main/java/org/whispersystems/libsignal/ratchet/ChainKey.java#L20
     MESSAGE_CHAIN_CONSTANT: Final = b"\x02\x01"
 
     @staticmethod
@@ -274,7 +280,10 @@ class StateImpl(x3dh.BaseState):
     The X3DH state implementation used by this version of the specification.
     """
 
-    INFO: Final = "OMEMO X3DH".encode("ASCII")
+    # https://github.com/signalapp/libsignal-protocol-java/blob/fde96d22004f32a391554e4991e4e1f0a14c2d50/java/
+    # src/main/java/org/whispersystems/libsignal/ratchet/RatchetingSession.java#L132
+    INFO: Final = "WhisperText".encode("ASCII")
+
     IDENTITY_KEY_ENCODING_LENGTH: Final = 32
 
     @staticmethod
@@ -503,7 +512,7 @@ class PlainKeyMaterialImpl(PlainKeyMaterial):
     :class:`~omemo.message.PlainKeyMaterial` implementation as a simple storage type.
     """
 
-    KEY_LENGTH: Final = 32
+    KEY_LENGTH: Final = 16
 
     def __init__(self, key: bytes, auth_tag: bytes) -> None:
         """
