@@ -3,7 +3,7 @@ from __future__ import annotations  # pylint: disable=unused-variable
 
 import base64
 import secrets
-from typing import Dict, Optional, Tuple, cast
+from typing import Dict, NamedTuple, Optional, Tuple, cast
 from typing_extensions import Final
 
 import doubleratchet
@@ -29,7 +29,6 @@ from omemo.types import JSONType
 
 # https://github.com/PyCQA/pylint/issues/4987
 from .oldmemo_pb2 import (  # pylint: disable=no-name-in-module
-    OMEMOAuthenticatedMessage,
     OMEMOKeyExchange,
     OMEMOMessage
 )
@@ -77,6 +76,47 @@ class MessageChainKDFImpl(kdf_separate_hmacs.KDF):
     @staticmethod
     def _get_hash_function() -> HashFunction:
         return HashFunction.SHA_256
+
+
+class OMEMOAuthenticatedMessage(NamedTuple):
+    """
+    The `urn:xmpp:omemo:2` version of the specification uses a protobuf structure called
+    ``OMEMOAuthenticatedMessage`` to hold and transfer a serialized :class:`OMEMOMessage` and an
+    authentication tag. This version of the specification instead uses simple concatenation of the two byte
+    strings. This class mocks the protobuf structure API to make maintaining this backend as a fork of
+    python-twomemo easier and to make the code cleaner.
+    """
+
+    mac: bytes
+    message: bytes
+
+    def SerializeToString(self, deterministic: bool = True) -> bytes:
+        """
+        Args:
+            deterministic: This parameter only exists to mimic protobuf's structure API and must be ``True``.
+
+        Returns:
+            The contents of this instance serialized as a byte string.
+        """
+
+        assert deterministic
+
+        return self.message + self.mac
+
+    @staticmethod
+    def FromString(serialized: bytes) -> OMEMOAuthenticatedMessage:
+        """
+        Args:
+            serialized: A serialized instance as returned by :meth:`SerializeToString`.
+
+        Returns:
+            An instance with the data restored from the serialized input.
+        """
+
+        return OMEMOAuthenticatedMessage(
+            mac=serialized[-AEADImpl.AUTHENTICATION_TAG_TRUNCATED_LENGTH:],
+            message=serialized[:-AEADImpl.AUTHENTICATION_TAG_TRUNCATED_LENGTH]
+        )
 
 
 class AEADImpl(aead_aes_hmac.AEAD):
@@ -594,22 +634,14 @@ class KeyExchangeImpl(KeyExchange):
 
         Returns:
             A serialized OMEMOKeyExchange message structure representing the content of this instance.
-
-        Raises:
-            ValueError: if the serialized OMEMOAuthenticatedMessage is malformed.
         """
-
-        try:
-            authenticated_message_parsed = OMEMOAuthenticatedMessage.FromString(authenticated_message)
-        except google.protobuf.message.DecodeError as e:
-            raise ValueError() from e
 
         return OMEMOKeyExchange(
             pk_id=self.__pre_key_id,
             spk_id=self.__signed_pre_key_id,
             ik=self.__header.identity_key,
             ek=self.__header.ephemeral_key,
-            message=authenticated_message_parsed
+            message=authenticated_message
         ).SerializeToString(True)
 
     @staticmethod
@@ -642,7 +674,7 @@ class KeyExchangeImpl(KeyExchange):
             x3dh.Header(parsed.ik, parsed.ek, b"", b""),
             parsed.spk_id,
             parsed.pk_id
-        ), parsed.message.SerializeToString(True)
+        ), parsed.message
 
 
 class SessionImpl(Session):
