@@ -368,6 +368,10 @@ class ContentImpl(Content):
 
         self.__ciphertext = ciphertext
 
+    @property
+    def empty(self) -> bool:
+        return self.__ciphertext == b""
+
     @staticmethod
     def make_empty() -> ContentImpl:
         """
@@ -386,15 +390,6 @@ class ContentImpl(Content):
         """
 
         return self.__ciphertext
-
-    @property
-    def empty(self) -> bool:
-        """
-        Returns:
-            Whether this instance corresponds to an empty OMEMO message.
-        """
-
-        return self.__ciphertext == b""
 
 
 class EncryptedKeyMaterialImpl(EncryptedKeyMaterial):
@@ -511,14 +506,16 @@ class PlainKeyMaterialImpl(PlainKeyMaterial):
 
         return self.__auth_tag
 
-    @property
-    def empty(self) -> bool:
+    @staticmethod
+    def make_empty() -> PlainKeyMaterialImpl:
         """
         Returns:
-            Whether this instance corresponds to an empty OMEMO message.
+            An "empty" instance, i.e. one that corresponds to an empty OMEMO message as per the specification.
+            The key stored in empty instances is a byte string of :attr:`KEY_LENGTH` zero-bytes, and the auth
+            tag is an empty byte string.
         """
 
-        return self.__key == b"\x00" * PlainKeyMaterialImpl.KEY_LENGTH and self.__auth_tag == b""
+        return PlainKeyMaterialImpl(b"\x00" * PlainKeyMaterialImpl.KEY_LENGTH, b"")
 
 
 class KeyExchangeImpl(KeyExchange):
@@ -1115,7 +1112,7 @@ class Twomemo(Backend):
         return ContentImpl(ciphertext), PlainKeyMaterialImpl(key, auth_tag)
 
     async def encrypt_empty(self) -> Tuple[ContentImpl, PlainKeyMaterialImpl]:
-        return ContentImpl.make_empty(), PlainKeyMaterialImpl(b"\x00" * PlainKeyMaterialImpl.KEY_LENGTH, b"")
+        return ContentImpl.make_empty(), PlainKeyMaterialImpl.make_empty()
 
     async def encrypt_key_material(
         self,
@@ -1137,6 +1134,8 @@ class Twomemo(Backend):
     async def decrypt_plaintext(self, content: Content, plain_key_material: PlainKeyMaterial) -> bytes:
         assert isinstance(content, ContentImpl)
         assert isinstance(plain_key_material, PlainKeyMaterialImpl)
+
+        assert not content.empty
 
         # Derive 80 bytes from the key using HKDF-SHA-256
         key_material = HKDF(
