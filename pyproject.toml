@@ -11,7 +11,7 @@ authors = [
     { name = "Tim Henkes (Syndace)", email = "me@syndace.dev" }
 ]
 maintainers = [ { name = "Tim Henkes (Syndace)", email = "me@syndace.dev" } ]
-license = "MIT"
+license = "AGPL-3.0-only"
 license-files = [ "LICENSE" ]
 requires-python = ">= 3.9"
 dependencies = [
