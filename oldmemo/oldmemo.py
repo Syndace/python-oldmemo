@@ -15,6 +15,7 @@ from doubleratchet.recommended import (
 )
 from doubleratchet.recommended.crypto_provider_impl import CryptoProviderImpl
 import google.protobuf.message
+import xeddsa
 import x3dh
 import x3dh.identity_key_pair
 
@@ -285,11 +286,20 @@ class StateImpl(x3dh.BaseState):
     # src/main/java/org/whispersystems/libsignal/ratchet/RatchetingSession.java#L132
     INFO: Final = "WhisperText".encode("ASCII")
 
-    IDENTITY_KEY_ENCODING_LENGTH: Final = 32
+    IDENTITY_KEY_ENCODING_LENGTH: Final = 33  # One byte constant + 32 bytes key
 
     @staticmethod
     def _encode_public_key(key_format: x3dh.IdentityKeyFormat, pub: bytes) -> bytes:
-        return pub
+        # python-omemo uses Ed25519 for the identity key format, while the 0.3.0 specification uses Curve25519
+        # encoding. This is one of the places where this difference matters, since the identity key will be
+        # passed in Ed25519 format, but required to be encoded as Curve25519. All keys but the identity key
+        # are fixed to Curve25519 format anyway, thus the following check should handle the compatibility:
+        if key_format is x3dh.IdentityKeyFormat.ED_25519:
+            pub = xeddsa.ed25519_pub_to_curve25519_pub(pub)
+
+        # https://github.com/signalapp/libsignal-protocol-java/blob/fde96d22004f32a391554e4991e4e1f0a14c2d50/
+        # java/src/main/java/org/whispersystems/libsignal/ecc/Curve.java#L17
+        return b"\x05" + pub
 
 
 class BundleImpl(Bundle):
@@ -783,6 +793,12 @@ class Oldmemo(Backend):
     """
     :class:`~omemo.backend.Backend` implementation providing OMEMO in the `eu.siacs.conversations.axolotl`
     namespace.
+
+    One notable implementation detail is the handling of the identity key format. The specification requires
+    the identity key to be transferred in Curve25519 format (in bundles, key exchanges etc.), while the
+    python-omemo library uses Ed25519 serialization whenever the identity key is referred to. Thus, conversion
+    has to happen during the serialization/parsing of transferred data, as done for example in
+    :mod:`oldmemo.etree`.
     """
 
     def __init__(
