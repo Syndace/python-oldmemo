@@ -18,6 +18,12 @@ DESCRIPTOR: _descriptor.FileDescriptor
 
 @_typing.final
 class OMEMOMessage(_message.Message):
+    """A modified version of SignalMessage defined in
+    https://github.com/signalapp/libsignal-protocol-java/blob/master/protobuf/WhisperTextProtocol.proto
+    Structure, field names, required/optional and order changed to match python-twomemo. The serialization
+    should not be affected by those modifications.
+    """
+
     DESCRIPTOR: _descriptor.Descriptor
 
     N_FIELD_NUMBER: _builtins.int
@@ -45,30 +51,13 @@ class OMEMOMessage(_message.Message):
 Global___OMEMOMessage: _TypeAlias = OMEMOMessage  # noqa: Y015
 
 @_typing.final
-class OMEMOAuthenticatedMessage(_message.Message):
-    DESCRIPTOR: _descriptor.Descriptor
-
-    MAC_FIELD_NUMBER: _builtins.int
-    MESSAGE_FIELD_NUMBER: _builtins.int
-    mac: _builtins.bytes
-    message: _builtins.bytes
-    """Byte-encoding of an OMEMOMessage"""
-    def __init__(
-        self,
-        *,
-        mac: _builtins.bytes | None = ...,
-        message: _builtins.bytes | None = ...,
-    ) -> None: ...
-    _HasFieldArgType: _TypeAlias = _typing.Literal["mac", b"mac", "message", b"message"]  # noqa: Y015
-    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["mac", b"mac", "message", b"message"]  # noqa: Y015
-    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
-    def WhichOneof(self, oneof_group: _Never) -> None: ...
-
-Global___OMEMOAuthenticatedMessage: _TypeAlias = OMEMOAuthenticatedMessage  # noqa: Y015
-
-@_typing.final
 class OMEMOKeyExchange(_message.Message):
+    """A modified version of PreKeySignalMessage defined in
+    https://github.com/signalapp/libsignal-protocol-java/blob/master/protobuf/WhisperTextProtocol.proto
+    Structure, field names, required/optional and order changed to match python-twomemo. The serialization
+    should not be affected by those modifications.
+    """
+
     DESCRIPTOR: _descriptor.Descriptor
 
     PK_ID_FIELD_NUMBER: _builtins.int
@@ -76,12 +65,14 @@ class OMEMOKeyExchange(_message.Message):
     IK_FIELD_NUMBER: _builtins.int
     EK_FIELD_NUMBER: _builtins.int
     MESSAGE_FIELD_NUMBER: _builtins.int
+    UNUSED_FIELD_NUMBER: _builtins.int
     pk_id: _builtins.int
     spk_id: _builtins.int
     ik: _builtins.bytes
     ek: _builtins.bytes
-    @_builtins.property
-    def message(self) -> Global___OMEMOAuthenticatedMessage: ...
+    message: _builtins.bytes
+    """Byte-encoding of an OMEMOMessage & authentication tag (see OMEMOAuthenticatedMessage in oldmemo/oldmemo.py)"""
+    unused: _builtins.int
     def __init__(
         self,
         *,
@@ -89,11 +80,12 @@ class OMEMOKeyExchange(_message.Message):
         spk_id: _builtins.int | None = ...,
         ik: _builtins.bytes | None = ...,
         ek: _builtins.bytes | None = ...,
-        message: Global___OMEMOAuthenticatedMessage | None = ...,
+        message: _builtins.bytes | None = ...,
+        unused: _builtins.int | None = ...,
     ) -> None: ...
-    _HasFieldArgType: _TypeAlias = _typing.Literal["ek", b"ek", "ik", b"ik", "message", b"message", "pk_id", b"pk_id", "spk_id", b"spk_id"]  # noqa: Y015
+    _HasFieldArgType: _TypeAlias = _typing.Literal["ek", b"ek", "ik", b"ik", "message", b"message", "pk_id", b"pk_id", "spk_id", b"spk_id", "unused", b"unused"]  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["ek", b"ek", "ik", b"ik", "message", b"message", "pk_id", b"pk_id", "spk_id", b"spk_id"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["ek", b"ek", "ik", b"ik", "message", b"message", "pk_id", b"pk_id", "spk_id", b"spk_id", "unused", b"unused"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 
