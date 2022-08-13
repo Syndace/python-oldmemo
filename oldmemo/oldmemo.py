@@ -5,6 +5,10 @@ import secrets
 from typing import Dict, NamedTuple, Optional, Tuple, cast
 from typing_extensions import Final
 
+from cryptography.exceptions import InvalidTag
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+
 import doubleratchet
 from doubleratchet.recommended import (
     aead_aes_hmac,
@@ -82,6 +86,7 @@ class MessageChainKDFImpl(kdf_separate_hmacs.KDF):
 
 
 class OMEMOAuthenticatedMessage(NamedTuple):
+    # pylint: disable=invalid-name
     """
     The `urn:xmpp:omemo:2` version of the specification uses a protobuf structure called
     ``OMEMOAuthenticatedMessage`` to hold and transfer a serialized :class:`OMEMOMessage` and an
@@ -402,30 +407,34 @@ class ContentImpl(Content):
     :class:`~omemo.message.Content` implementation as a simple storage type.
     """
 
-    def __init__(self, ciphertext: bytes) -> None:
+    def __init__(self, ciphertext: bytes, initialization_vector: bytes) -> None:
         """
         Args:
             ciphertext: The ciphertext to store in this instance.
+            initialization_vector: The initialization vector to store in this instance.
 
         Note:
-            For empty OMEMO messages as per the specification, the ciphertext is set to an empty byte string.
+            For empty OMEMO messages as per the specification, the ciphertext and initialization vector are
+            set to empty byte strings.
         """
 
         self.__ciphertext = ciphertext
+        self.__initialization_vector = initialization_vector
 
     @property
     def empty(self) -> bool:
-        return self.__ciphertext == b""
+        return self.__ciphertext == b"" and self.__initialization_vector == b""
 
     @staticmethod
     def make_empty() -> ContentImpl:
         """
         Returns:
             An "empty" instance, i.e. one that corresponds to an empty OMEMO message as per the specification.
-            The ciphertext stored in empty instances is a byte string of zero length.
+            The ciphertext and initialization vector stored in empty instances are byte strings of zero
+            length.
         """
 
-        return ContentImpl(b"")
+        return ContentImpl(b"", b"")
 
     @property
     def ciphertext(self) -> bytes:
@@ -435,6 +444,15 @@ class ContentImpl(Content):
         """
 
         return self.__ciphertext
+
+    @property
+    def initialization_vector(self) -> bytes:
+        """
+        Returns:
+            The initialization vector held by this instance.
+        """
+
+        return self.__initialization_vector
 
 
 class EncryptedKeyMaterialImpl(EncryptedKeyMaterial):
@@ -1146,36 +1164,22 @@ class Oldmemo(Backend):
         # Generate KEY_LENGTH bytes of cryptographically secure random data for the key
         key = secrets.token_bytes(PlainKeyMaterialImpl.KEY_LENGTH)
 
-        # Derive 80 bytes from the key using HKDF-SHA-256
-        key_material = await CryptoProviderImpl.hkdf_derive(
-            hash_function=HashFunction.SHA_256,
-            length=80,
-            salt=b"\x00" * 32,
-            info="OMEMO Payload".encode("ASCII"),
-            key_material=key
-        )
+        # Generate 12 bytes for the IV
+        initialization_vector = secrets.token_bytes(12)
 
-        # Split those 80 bytes into an encryption key, authentication key and an initialization vector
-        encryption_key = key_material[:32]
-        authentication_key = key_material[32:64]
-        initialization_vector = key_material[64:]
+        # Encrypt the plaintext using AES-128 (the 128 bit are implied by the key size) in GCM mode and the
+        # previously created key and IV
+        aes = Cipher(
+            algorithms.AES(key),
+            modes.GCM(initialization_vector),
+            backend=default_backend()
+        ).encryptor()
+        ciphertext = aes.update(plaintext) + aes.finalize()  # pylint: disable=no-member
 
-        # Encrypt the plaintext using AES-256 (the 256 bit are implied by the key size) in CBC mode and the
-        # previously created key and IV, after padding it with PKCS#7
-        ciphertext = await CryptoProviderImpl.aes_cbc_encrypt(
-            encryption_key,
-            initialization_vector,
-            plaintext
-        )
+        # Truncate the authentication tag to AUTHENTICATION_TAG_TRUNCATED_LENGTH bytes
+        auth_tag = aes.tag[:AEADImpl.AUTHENTICATION_TAG_TRUNCATED_LENGTH]  # pylint: disable=no-member
 
-        # Calculate the authentication tag and truncate it to AUTHENTICATION_TAG_TRUNCATED_LENGTH bytes
-        auth_tag = (await CryptoProviderImpl.hmac_calculate(
-            authentication_key,
-            HashFunction.SHA_256,
-            ciphertext
-        ))[:AEADImpl.AUTHENTICATION_TAG_TRUNCATED_LENGTH]
-
-        return ContentImpl(ciphertext), PlainKeyMaterialImpl(key, auth_tag)
+        return ContentImpl(ciphertext, initialization_vector), PlainKeyMaterialImpl(key, auth_tag)
 
     async def encrypt_empty(self) -> Tuple[ContentImpl, PlainKeyMaterialImpl]:
         return ContentImpl.make_empty(), PlainKeyMaterialImpl.make_empty()
@@ -1203,38 +1207,17 @@ class Oldmemo(Backend):
 
         assert not content.empty
 
-        # Derive 80 bytes from the key using HKDF-SHA-256
-        key_material = await CryptoProviderImpl.hkdf_derive(
-            hash_function=HashFunction.SHA_256,
-            length=80,
-            salt=b"\x00" * 32,
-            info="OMEMO Payload".encode("ASCII"),
-            key_material=plain_key_material.key
-        )
-
-        # Split those 80 bytes into an encryption key, authentication key and an initialization vector
-        decryption_key = key_material[:32]
-        authentication_key = key_material[32:64]
-        initialization_vector = key_material[64:]
-
-        # Calculate and verify the authentication tag after truncating it to
-        # AUTHENTICATION_TAG_TRUNCATED_LENGTH bytes
-        auth_tag = (await CryptoProviderImpl.hmac_calculate(
-            authentication_key,
-            HashFunction.SHA_256,
-            content.ciphertext
-        ))[:AEADImpl.AUTHENTICATION_TAG_TRUNCATED_LENGTH]
-
-        if auth_tag != plain_key_material.auth_tag:
-            raise DecryptionFailed("Authentication tag verification failed.")
-
-        # Decrypt the plaintext using AES-256 (the 256 bit are implied by the key size) in CBC mode and the
-        # previously created key and IV, and unpad the resulting plaintext with PKCS#7
-        return await CryptoProviderImpl.aes_cbc_decrypt(
-            decryption_key,
-            initialization_vector,
-            content.ciphertext
-        )
+        # Decrypt the plaintext using AES-128 (the 128 bit are implied by the key size) in GCM mode and the
+        # key and IV in plain_key_material, while also verifying the authentication tag.
+        aes = Cipher(
+            algorithms.AES(plain_key_material.key),
+            modes.GCM(content.initialization_vector, plain_key_material.auth_tag),
+            backend=default_backend()
+        ).decryptor()
+        try:
+            return aes.update(content.ciphertext) + aes.finalize()  # pylint: disable=no-member
+        except InvalidTag as e:
+            raise DecryptionFailed("Ciphertext decryption failed.") from e
 
     async def decrypt_key_material(
         self,
