@@ -11,6 +11,11 @@ import typing_extensions
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
 class OMEMOMessage(google.protobuf.message.Message):
+    """A modified version of SignalMessage defined in
+    https://github.com/signalapp/libsignal-protocol-java/blob/master/protobuf/WhisperTextProtocol.proto
+    Structure, field names, required/optional and order changed to match python-twomemo. The serialization
+    should not be affected by those modifications.
+    """
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
     N_FIELD_NUMBER: builtins.int
     PN_FIELD_NUMBER: builtins.int
@@ -31,44 +36,36 @@ class OMEMOMessage(google.protobuf.message.Message):
     def ClearField(self, field_name: typing_extensions.Literal["ciphertext",b"ciphertext","dh_pub",b"dh_pub","n",b"n","pn",b"pn"]) -> None: ...
 global___OMEMOMessage = OMEMOMessage
 
-class OMEMOAuthenticatedMessage(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-    MAC_FIELD_NUMBER: builtins.int
-    MESSAGE_FIELD_NUMBER: builtins.int
-    mac: builtins.bytes
-    message: builtins.bytes
-    """Byte-encoding of an OMEMOMessage"""
-
-    def __init__(self,
-        *,
-        mac: typing.Optional[builtins.bytes] = ...,
-        message: typing.Optional[builtins.bytes] = ...,
-        ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["mac",b"mac","message",b"message"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["mac",b"mac","message",b"message"]) -> None: ...
-global___OMEMOAuthenticatedMessage = OMEMOAuthenticatedMessage
-
 class OMEMOKeyExchange(google.protobuf.message.Message):
+    """A modified version of PreKeySignalMessage defined in
+    https://github.com/signalapp/libsignal-protocol-java/blob/master/protobuf/WhisperTextProtocol.proto
+    Structure, field names, required/optional and order changed to match python-twomemo. The serialization
+    should not be affected by those modifications.
+    """
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
     PK_ID_FIELD_NUMBER: builtins.int
     SPK_ID_FIELD_NUMBER: builtins.int
     IK_FIELD_NUMBER: builtins.int
     EK_FIELD_NUMBER: builtins.int
     MESSAGE_FIELD_NUMBER: builtins.int
+    UNUSED_FIELD_NUMBER: builtins.int
     pk_id: builtins.int
     spk_id: builtins.int
     ik: builtins.bytes
     ek: builtins.bytes
-    @property
-    def message(self) -> global___OMEMOAuthenticatedMessage: ...
+    message: builtins.bytes
+    """Byte-encoding of an OMEMOMessage & authentication tag (see OMEMOAuthenticatedMessage in oldmemo/oldmemo.py)"""
+
+    unused: builtins.int
     def __init__(self,
         *,
         pk_id: typing.Optional[builtins.int] = ...,
         spk_id: typing.Optional[builtins.int] = ...,
         ik: typing.Optional[builtins.bytes] = ...,
         ek: typing.Optional[builtins.bytes] = ...,
-        message: typing.Optional[global___OMEMOAuthenticatedMessage] = ...,
+        message: typing.Optional[builtins.bytes] = ...,
+        unused: typing.Optional[builtins.int] = ...,
         ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["ek",b"ek","ik",b"ik","message",b"message","pk_id",b"pk_id","spk_id",b"spk_id"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["ek",b"ek","ik",b"ik","message",b"message","pk_id",b"pk_id","spk_id",b"spk_id"]) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["ek",b"ek","ik",b"ik","message",b"message","pk_id",b"pk_id","spk_id",b"spk_id","unused",b"unused"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["ek",b"ek","ik",b"ik","message",b"message","pk_id",b"pk_id","spk_id",b"spk_id","unused",b"unused"]) -> None: ...
 global___OMEMOKeyExchange = OMEMOKeyExchange
