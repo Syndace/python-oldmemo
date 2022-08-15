@@ -34,19 +34,19 @@ DEVICE_LIST_SCHEMA = xmlschema.XMLSchema("""<?xml version="1.0" encoding="utf8"?
     targetNamespace="eu.siacs.conversations.axolotl"
     xmlns="eu.siacs.conversations.axolotl">
 
-  <xs:element name="device">
-    <xs:complexType>
-      <xs:attribute name="id" type="xs:unsignedInt" use="required"/>
-    </xs:complexType>
-  </xs:element>
+    <xs:element name="device">
+        <xs:complexType>
+            <xs:attribute name="id" type="xs:unsignedInt" use="required"/>
+        </xs:complexType>
+    </xs:element>
 
-  <xs:element name="list">
-    <xs:complexType>
-      <xs:sequence>
-        <xs:element ref="device" maxOccurs="unbounded"/>
-      </xs:sequence>
-    </xs:complexType>
-  </xs:element>
+    <xs:element name="list">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element ref="device" maxOccurs="unbounded"/>
+            </xs:sequence>
+        </xs:complexType>
+    </xs:element>
 </xs:schema>
 """)
 
@@ -56,47 +56,47 @@ BUNDLE_SCHEMA = xmlschema.XMLSchema("""<?xml version="1.0" encoding="utf8"?>
     targetNamespace="eu.siacs.conversations.axolotl"
     xmlns="eu.siacs.conversations.axolotl">
 
-  <xs:element name="signedPreKeyPublic">
-    <xs:complexType>
-      <xs:simpleContent>
-        <xs:extension base='xs:base64Binary'>
-          <xs:attribute name="signedPreKeyId" type="xs:unsignedInt"/>
-        </xs:extension>
-      </xs:simpleContent>
-    </xs:complexType>
-  </xs:element>
+    <xs:element name="signedPreKeyPublic">
+        <xs:complexType>
+            <xs:simpleContent>
+                <xs:extension base='xs:base64Binary'>
+                    <xs:attribute name="signedPreKeyId" type="xs:unsignedInt"/>
+                </xs:extension>
+            </xs:simpleContent>
+        </xs:complexType>
+    </xs:element>
 
-  <xs:element name='signedPreKeySignature' type='xs:base64Binary'/>
-  <xs:element name='identityKey' type='xs:base64Binary'/>
+    <xs:element name='signedPreKeySignature' type='xs:base64Binary'/>
+    <xs:element name='identityKey' type='xs:base64Binary'/>
 
-  <xs:element name="preKeyPublic">
-    <xs:complexType>
-      <xs:simpleContent>
-        <xs:extension base='xs:base64Binary'>
-          <xs:attribute name="preKeyId" type="xs:unsignedInt" use="required"/>
-        </xs:extension>
-      </xs:simpleContent>
-    </xs:complexType>
-  </xs:element>
+    <xs:element name="preKeyPublic">
+        <xs:complexType>
+            <xs:simpleContent>
+                <xs:extension base='xs:base64Binary'>
+                    <xs:attribute name="preKeyId" type="xs:unsignedInt" use="required"/>
+                </xs:extension>
+            </xs:simpleContent>
+        </xs:complexType>
+    </xs:element>
 
-  <xs:element name="prekeys">
-    <xs:complexType>
-      <xs:sequence>
-        <xs:element ref="preKeyPublic" maxOccurs="unbounded"/>
-      </xs:sequence>
-    </xs:complexType>
-  </xs:element>
+    <xs:element name="prekeys">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element ref="preKeyPublic" maxOccurs="unbounded"/>
+            </xs:sequence>
+        </xs:complexType>
+    </xs:element>
 
-  <xs:element name="bundle">
-    <xs:complexType>
-      <xs:sequence>
-        <xs:element ref="signedPreKeyPublic"/>
-        <xs:element ref="signedPreKeySignature"/>
-        <xs:element ref="identityKey"/>
-        <xs:element ref="prekeys"/>
-      </xs:sequence>
-    </xs:complexType>
-  </xs:element>
+    <xs:element name="bundle">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element ref="signedPreKeyPublic"/>
+                <xs:element ref="signedPreKeySignature"/>
+                <xs:element ref="identityKey"/>
+                <xs:element ref="prekeys"/>
+            </xs:sequence>
+        </xs:complexType>
+    </xs:element>
 </xs:schema>
 """)
 
@@ -106,38 +106,38 @@ MESSAGE_SCHEMA = xmlschema.XMLSchema("""<?xml version="1.0" encoding="utf8"?>
     targetNamespace="eu.siacs.conversations.axolotl"
     xmlns="eu.siacs.conversations.axolotl">
 
-  <xs:element name="payload" type="xs:base64Binary"/>
-  <xs:element name="iv" type="xs:base64Binary"/>
+    <xs:element name="payload" type="xs:base64Binary"/>
+    <xs:element name="iv" type="xs:base64Binary"/>
 
-  <xs:element name="key">
-    <xs:complexType>
-      <xs:simpleContent>
-        <xs:extension base='xs:base64Binary'>
-          <xs:attribute name="rid" type="xs:unsignedInt" use="required"/>
-          <xs:attribute name="prekey" type="xs:boolean"/>
-        </xs:extension>
-      </xs:simpleContent>
-    </xs:complexType>
-  </xs:element>
+    <xs:element name="key">
+        <xs:complexType>
+            <xs:simpleContent>
+                <xs:extension base='xs:base64Binary'>
+                    <xs:attribute name="rid" type="xs:unsignedInt" use="required"/>
+                    <xs:attribute name="prekey" type="xs:boolean"/>
+                </xs:extension>
+            </xs:simpleContent>
+        </xs:complexType>
+    </xs:element>
 
-  <xs:element name="header">
-    <xs:complexType>
-      <xs:sequence>
-        <xs:element ref="key" maxOccurs="unbounded"/>
-        <xs:element ref="iv"/>
-      </xs:sequence>
-      <xs:attribute name="sid" type="xs:unsignedInt"/>
-    </xs:complexType>
-  </xs:element>
+    <xs:element name="header">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element ref="key" maxOccurs="unbounded"/>
+                <xs:element ref="iv"/>
+            </xs:sequence>
+            <xs:attribute name="sid" type="xs:unsignedInt"/>
+        </xs:complexType>
+    </xs:element>
 
-  <xs:element name="encrypted">
-    <xs:complexType>
-      <xs:all>
-        <xs:element ref="header"/>
-        <xs:element ref="payload" minOccurs="0"/>
-      </xs:all>
-    </xs:complexType>
-  </xs:element>
+    <xs:element name="encrypted">
+        <xs:complexType>
+            <xs:all>
+                <xs:element ref="header"/>
+                <xs:element ref="payload" minOccurs="0"/>
+            </xs:all>
+        </xs:complexType>
+    </xs:element>
 </xs:schema>
 """)
 
