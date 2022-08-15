@@ -414,8 +414,9 @@ class ContentImpl(Content):
             initialization_vector: The initialization vector to store in this instance.
 
         Note:
-            For empty OMEMO messages as per the specification, the ciphertext and initialization vector are
-            set to empty byte strings.
+            For empty OMEMO messages as per the specification, the ciphertext is set to an empty byte string
+            and the initialization vector is initialized with a valid initialization vector for further use by
+            external protocols (aka ``KeyTransportMessage``).
         """
 
         self.__ciphertext = ciphertext
@@ -423,18 +424,18 @@ class ContentImpl(Content):
 
     @property
     def empty(self) -> bool:
-        return self.__ciphertext == b"" and self.__initialization_vector == b""
+        return self.__ciphertext == b""
 
     @staticmethod
     def make_empty() -> ContentImpl:
         """
         Returns:
             An "empty" instance, i.e. one that corresponds to an empty OMEMO message as per the specification.
-            The ciphertext and initialization vector stored in empty instances are byte strings of zero
-            length.
+            The ciphertext is set to an empty byte string and the initialization vector is initialized with a
+            valid initialization vector for further use by external protocols (aka ``KeyTransportMessage``).
         """
 
-        return ContentImpl(b"", b"")
+        return ContentImpl(b"", secrets.token_bytes(12))
 
     @property
     def ciphertext(self) -> bytes:
@@ -552,8 +553,9 @@ class PlainKeyMaterialImpl(PlainKeyMaterial):
             auth_tag: The authentication tag to store in this instance.
 
         Note:
-            For empty OMEMO messages as per the specification, the key is set to :attr:`KEY_LENGTH`
-            zero-bytes, and the auth tag is set to an empty byte string.
+            For empty OMEMO messages as per the specification, the key is set to a freshly generated key for
+            further use by external protocols (aka ``KeyTransportMessage``), while the auth tag is set to an
+            empty byte string.
         """
 
         self.__key = key
@@ -582,11 +584,11 @@ class PlainKeyMaterialImpl(PlainKeyMaterial):
         """
         Returns:
             An "empty" instance, i.e. one that corresponds to an empty OMEMO message as per the specification.
-            The key stored in empty instances is a byte string of :attr:`KEY_LENGTH` zero-bytes, and the auth
-            tag is an empty byte string.
+            The key stored in empty instances is a freshly generated key for further use by external protocols
+            (aka ``KeyTransportMessage``), while the auth tag is set to an empty byte string.
         """
 
-        return PlainKeyMaterialImpl(b"\x00" * PlainKeyMaterialImpl.KEY_LENGTH, b"")
+        return PlainKeyMaterialImpl(secrets.token_bytes(PlainKeyMaterialImpl.KEY_LENGTH), b"")
 
 
 class KeyExchangeImpl(KeyExchange):
