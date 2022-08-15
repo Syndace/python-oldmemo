@@ -1,5 +1,7 @@
 syntax = "proto2";
 
+package twomemo;
+
 message OMEMOMessage {
     required uint32 n          = 1;
     required uint32 pn         = 2;

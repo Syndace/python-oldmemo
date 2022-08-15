@@ -12,7 +12,7 @@ except ImportError as e:
         " `pip install python-twomemo[xml]`, to use the ElementTree-based XML serialization/parser helpers."
     ) from e
 
-from .twomemo import BundleImpl, ContentImpl, EncryptedKeyMaterialImpl, KeyExchangeImpl
+from .twomemo import NAMESPACE, BundleImpl, ContentImpl, EncryptedKeyMaterialImpl, KeyExchangeImpl
 
 
 __all__ = [  # pylint: disable=unused-variable
@@ -25,7 +25,7 @@ __all__ = [  # pylint: disable=unused-variable
 ]
 
 
-NAMESPACE = "urn:xmpp:omemo:2"
+NS = f"{{{NAMESPACE}}}"
 
 
 DEVICE_LIST_SCHEMA = xmlschema.XMLSchema("""<?xml version='1.0' encoding='UTF-8'?>
@@ -159,10 +159,10 @@ def serialize_device_list(device_list: Dict[int, Optional[str]]) -> ET.Element:
         The serialized device list as an XML element.
     """
 
-    devices_elt = ET.Element(f"{NAMESPACE}devices")
+    devices_elt = ET.Element(f"{NS}devices")
 
     for device_id, label in device_list.items():
-        device_elt = ET.SubElement(devices_elt, f"{NAMESPACE}device")
+        device_elt = ET.SubElement(devices_elt, f"{NS}device")
         device_elt.set("id", str(device_id))
         if label is not None:
             device_elt.set("label", label)
@@ -189,7 +189,7 @@ def parse_device_list(element: ET.Element) -> Dict[int, Optional[str]]:
     return {
         int(cast(str, device_elt.get("id"))): device_elt.get("label", None)
         for device_elt
-        in element.iter(f"{NAMESPACE}device")
+        in element.iter(f"{NS}device")
     }
 
 
@@ -202,32 +202,32 @@ def serialize_bundle(bundle: BundleImpl) -> ET.Element:
         The serialized bundle as an XML element.
     """
 
-    bundle_elt = ET.Element(f"{NAMESPACE}bundle")
+    bundle_elt = ET.Element(f"{NS}bundle")
 
     ET.SubElement(
         bundle_elt,
-        f"{NAMESPACE}spk",
+        f"{NS}spk",
         attrib={ "id": str(bundle.signed_pre_key_id) },
         text=base64.b64encode(bundle.bundle.signed_pre_key).decode("ASCII")
     )
 
     ET.SubElement(
         bundle_elt,
-        f"{NAMESPACE}spks",
+        f"{NS}spks",
         text=base64.b64encode(bundle.bundle.signed_pre_key_sig).decode("ASCII")
     )
 
     ET.SubElement(
         bundle_elt,
-        f"{NAMESPACE}ik",
+        f"{NS}ik",
         text=base64.b64encode(bundle.bundle.identity_key).decode("ASCII")
     )
 
-    prekeys_elt = ET.SubElement(bundle_elt, f"{NAMESPACE}prekeys")
+    prekeys_elt = ET.SubElement(bundle_elt, f"{NS}prekeys")
     for pre_key in bundle.bundle.pre_keys:
         ET.SubElement(
             prekeys_elt,
-            f"{NAMESPACE}pk",
+            f"{NS}pk",
             attrib={ "id": str(bundle.pre_key_ids[pre_key]) },
             text=base64.b64encode(pre_key).decode("ASCII")
         )
@@ -252,16 +252,16 @@ def parse_bundle(element: ET.Element, bare_jid: str, device_id: int) -> BundleIm
 
     BUNDLE_SCHEMA.validate(element)
 
-    spk_elt = cast(ET.Element, element.find(f"{NAMESPACE}spk"))
-    pk_elts = list(element.iter(f"{NAMESPACE}pk"))
+    spk_elt = cast(ET.Element, element.find(f"{NS}spk"))
+    pk_elts = list(element.iter(f"{NS}pk"))
 
     return BundleImpl(
         bare_jid,
         device_id,
         x3dh.Bundle(
-            base64.b64decode(cast(str, cast(ET.Element, element.find(f"{NAMESPACE}ik")).text)),
+            base64.b64decode(cast(str, cast(ET.Element, element.find(f"{NS}ik")).text)),
             base64.b64decode(cast(str, spk_elt.text)),
-            base64.b64decode(cast(str, cast(ET.Element, element.find(f"{NAMESPACE}spks")).text)),
+            base64.b64decode(cast(str, cast(ET.Element, element.find(f"{NS}spks")).text)),
             { base64.b64decode(cast(str, pk_elt.text)) for pk_elt in pk_elts }
         ),
         int(cast(str, spk_elt.get("id"))),
@@ -280,12 +280,12 @@ def serialize_message(message: Message) -> ET.Element:
 
     assert isinstance(message.content, ContentImpl)
 
-    encrypted_elt = ET.Element(f"{NAMESPACE}encrypted")
+    encrypted_elt = ET.Element(f"{NS}encrypted")
 
-    header_elt = ET.SubElement(encrypted_elt, f"{NAMESPACE}header", attrib={ "sid": str(message.device_id) })
+    header_elt = ET.SubElement(encrypted_elt, f"{NS}header", attrib={ "sid": str(message.device_id) })
 
     for bare_jid in { encrypted_key_material.bare_jid for encrypted_key_material, _ in message.keys }:
-        keys_elt = ET.SubElement(header_elt, f"{NAMESPACE}keys", attrib={ "jid": bare_jid })
+        keys_elt = ET.SubElement(header_elt, f"{NS}keys", attrib={ "jid": bare_jid })
 
         keys = { key for key in message.keys if key[0].bare_jid == bare_jid }
         for encrypted_key_material, key_exchange in keys:
@@ -293,7 +293,7 @@ def serialize_message(message: Message) -> ET.Element:
 
             key_elt = ET.SubElement(
                 keys_elt,
-                f"{NAMESPACE}key",
+                f"{NS}key",
                 attrib={ "rid": str(encrypted_key_material.device_id) }
             )
 
@@ -310,7 +310,7 @@ def serialize_message(message: Message) -> ET.Element:
     if not message.content.empty:
         ET.SubElement(
             encrypted_elt,
-            f"{NAMESPACE}payload",
+            f"{NS}payload",
             text=base64.b64encode(message.content.ciphertext).decode("ASCII")
         )
 
@@ -333,14 +333,14 @@ def parse_message(element: ET.Element, bare_jid: str) -> Message:
 
     MESSAGE_SCHEMA.validate(element)
 
-    payload_elt = element.find(f"{NAMESPACE}payload")
+    payload_elt = element.find(f"{NS}payload")
 
     keys: Set[Tuple[EncryptedKeyMaterial, Optional[KeyExchange]]] = set()
 
-    for keys_elt in element.iter(f"{NAMESPACE}keys"):
+    for keys_elt in element.iter(f"{NS}keys"):
         recipient_bare_jid = cast(str, keys_elt.get("jid"))
 
-        for key_elt in keys_elt.iter(f"{NAMESPACE}key"):
+        for key_elt in keys_elt.iter(f"{NS}key"):
             recipient_device_id = int(cast(str, key_elt.get("rid")))
             content = base64.b64decode(cast(str, key_elt.text))
 
@@ -362,7 +362,7 @@ def parse_message(element: ET.Element, bare_jid: str) -> Message:
     return Message(
         NAMESPACE,
         bare_jid,
-        int(cast(str, cast(ET.Element, element.find(f"{NAMESPACE}header")).get("sid"))),
+        int(cast(str, cast(ET.Element, element.find(f"{NS}header")).get("sid"))),
         (
             ContentImpl.make_empty()
             if payload_elt is None
