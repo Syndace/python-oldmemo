@@ -262,7 +262,7 @@ def parse_bundle(element: ET.Element, bare_jid: str, device_id: int) -> BundleIm
             base64.b64decode(cast(str, cast(ET.Element, element.find(f"{NS}ik")).text)),
             base64.b64decode(cast(str, spk_elt.text)),
             base64.b64decode(cast(str, cast(ET.Element, element.find(f"{NS}spks")).text)),
-            { base64.b64decode(cast(str, pk_elt.text)) for pk_elt in pk_elts }
+            frozenset(base64.b64decode(cast(str, pk_elt.text)) for pk_elt in pk_elts)
         ),
         int(cast(str, spk_elt.get("id"))),
         { base64.b64decode(cast(str, pk_elt.text)): int(cast(str, pk_elt.get("id"))) for pk_elt in pk_elts }
@@ -284,10 +284,10 @@ def serialize_message(message: Message) -> ET.Element:
 
     header_elt = ET.SubElement(encrypted_elt, f"{NS}header", attrib={ "sid": str(message.device_id) })
 
-    for bare_jid in { encrypted_key_material.bare_jid for encrypted_key_material, _ in message.keys }:
+    for bare_jid in frozenset(encrypted_key_material.bare_jid for encrypted_key_material, _ in message.keys):
         keys_elt = ET.SubElement(header_elt, f"{NS}keys", attrib={ "jid": bare_jid })
 
-        keys = { key for key in message.keys if key[0].bare_jid == bare_jid }
+        keys = frozenset(key for key in message.keys if key[0].bare_jid == bare_jid)
         for encrypted_key_material, key_exchange in keys:
             assert isinstance(encrypted_key_material, EncryptedKeyMaterialImpl)
 
@@ -368,5 +368,5 @@ def parse_message(element: ET.Element, bare_jid: str) -> Message:
             if payload_elt is None
             else ContentImpl(base64.b64decode(cast(str, payload_elt.text)))
         ),
-        keys
+        frozenset(keys)
     )
