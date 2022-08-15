@@ -32,7 +32,7 @@ from omemo.storage import Storage
 from omemo.types import JSONType
 
 # https://github.com/PyCQA/pylint/issues/4987
-from .schema_pb2 import (  # pylint: disable=no-name-in-module
+from .twomemo_pb2 import (  # pylint: disable=no-name-in-module
     OMEMOAuthenticatedMessage,
     OMEMOKeyExchange,
     OMEMOMessage
@@ -41,6 +41,7 @@ from .schema_pb2 import (  # pylint: disable=no-name-in-module
 
 __all__ = [  # pylint: disable=unused-variable
     "Twomemo",
+    "NAMESPACE",
     "AEADImpl",
     "BundleImpl",
     "ContentImpl",

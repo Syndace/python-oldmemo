@@ -19,10 +19,10 @@ Install `protoc`. Then, in the root directory of this repository, run:
 
 ```sh
 $ pip install protobuf mypy mypy-protobuf types-protobuf
-$ protoc --python_out=twomemo/ --mypy_out=twomemo/ schema.proto
+$ protoc --python_out=twomemo/ --mypy_out=twomemo/ twomemo.proto
 ```
 
-This will generate `twomemo/schema_pb2.py` and `twomemo/schema_pb2.pyi`.
+This will generate `twomemo/twomemo_pb2.py` and `twomemo/twomemo_pb2.pyi`.
 
 ## Testing, Type Checks and Linting ##
 
