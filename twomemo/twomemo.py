@@ -1333,7 +1333,7 @@ class Twomemo(Backend):
         signed_pre_key_id_counter = max(
             signed_pre_key_id
             for _, signed_pre_key_id
-            in signed_pre_key_ids
+            in signed_pre_key_ids.items()
         ) if len(signed_pre_key_ids) > 0 else 0
 
         # Prepare the dictionary to hold updated signed pre key ids
