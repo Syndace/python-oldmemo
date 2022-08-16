@@ -123,8 +123,9 @@ MESSAGE_SCHEMA = xmlschema.XMLSchema("""<?xml version="1.0" encoding="utf8"?>
     <xs:element name="header">
         <xs:complexType>
             <xs:sequence>
-                <xs:element ref="key" maxOccurs="unbounded"/>
+                <xs:element ref="key" minOccurs="0" maxOccurs="unbounded"/>
                 <xs:element ref="iv"/>
+                <xs:element ref="key" minOccurs="0" maxOccurs="unbounded"/>
             </xs:sequence>
             <xs:attribute name="sid" type="xs:unsignedInt"/>
         </xs:complexType>
