@@ -2,18 +2,25 @@ import base64
 from typing import Dict, Optional, Set, Tuple, cast
 import xml.etree.ElementTree as ET
 
-from omemo import EncryptedKeyMaterial, KeyExchange, Message
+from omemo import (
+    DeviceListDownloadFailed,
+    EncryptedKeyMaterial,
+    KeyExchange,
+    Message,
+    SenderNotFound,
+    SessionManager
+)
 import x3dh
 import xeddsa
 try:
     import xmlschema
-except ImportError as e:
+except ImportError as import_error:
     raise ImportError(
         "Optional dependency xmlschema not found. Please install xmlschema, or install this package using"
         " `pip install python-oldmemo[xml]`, to use the ElementTree-based XML serialization/parser helpers."
-    ) from e
+    ) from import_error
 
-from .oldmemo import NAMESPACE, BundleImpl, ContentImpl, EncryptedKeyMaterialImpl, KeyExchangeImpl
+from .oldmemo import NAMESPACE, BundleImpl, ContentImpl, EncryptedKeyMaterialImpl, KeyExchangeImpl, StateImpl
 
 
 __all__ = [
@@ -194,17 +201,15 @@ def serialize_bundle(bundle: BundleImpl) -> ET.Element:
 
     bundle_elt = ET.Element(f"{NS}bundle")
 
-    identity_key_sign = (bundle.bundle.identity_key[31] >> 7) & 1
-    identity_key_serialized = b"\x05" + xeddsa.ed25519_pub_to_curve25519_pub(bundle.bundle.identity_key)
     signed_pre_key_signature_mut = bytearray(bundle.bundle.signed_pre_key_sig)
-    signed_pre_key_signature_mut[63] |= identity_key_sign << 7
+    signed_pre_key_signature_mut[63] |= bundle.bundle.identity_key[31] & 0x80
     signed_pre_key_signature = bytes(signed_pre_key_signature_mut)
 
     ET.SubElement(
         bundle_elt,
         f"{NS}signedPreKeyPublic",
         attrib={ "signedPreKeyId": str(bundle.signed_pre_key_id) }
-    ).text = base64.b64encode(bundle.bundle.signed_pre_key).decode("ASCII")
+    ).text = base64.b64encode(StateImpl.serialize_public_key(bundle.bundle.signed_pre_key)).decode("ASCII")
 
     ET.SubElement(
         bundle_elt,
@@ -214,7 +219,9 @@ def serialize_bundle(bundle: BundleImpl) -> ET.Element:
     ET.SubElement(
         bundle_elt,
         f"{NS}identityKey"
-    ).text = base64.b64encode(identity_key_serialized).decode("ASCII")
+    ).text = base64.b64encode(StateImpl.serialize_public_key(xeddsa.ed25519_pub_to_curve25519_pub(
+        bundle.bundle.identity_key
+    ))).decode("ASCII")
 
     prekeys_elt = ET.SubElement(bundle_elt, f"{NS}prekeys")
     for pre_key in bundle.bundle.pre_keys:
@@ -222,7 +229,7 @@ def serialize_bundle(bundle: BundleImpl) -> ET.Element:
             prekeys_elt,
             f"{NS}preKeyPublic",
             attrib={ "preKeyId": str(bundle.pre_key_ids[pre_key]) }
-        ).text = base64.b64encode(pre_key).decode("ASCII")
+        ).text = base64.b64encode(StateImpl.serialize_public_key(pre_key)).decode("ASCII")
 
     return bundle_elt
 
@@ -238,6 +245,7 @@ def parse_bundle(element: ET.Element, bare_jid: str, device_id: int) -> BundleIm
         The extracted bundle.
 
     Raises:
+        ValueError: in case of malformed data that still passed the schema validation.
         XMLSchemaValidationError: in case the element does not conform to the XML schema given in the
             specification.
     """
@@ -251,35 +259,32 @@ def parse_bundle(element: ET.Element, bare_jid: str, device_id: int) -> BundleIm
         f"{NS}signedPreKeySignature"
     )).text))
 
-    identity_key_sign = (signed_pre_key_signature[63] >> 7) & 1
+    identity_key = xeddsa.curve25519_pub_to_ed25519_pub(StateImpl.parse_public_key(base64.b64decode(
+        cast(str, cast(ET.Element, element.find(f"{NS}identityKey")).text)
+    )), bool((signed_pre_key_signature[63] >> 7) & 1))
 
     signed_pre_key_signature_mut = bytearray(signed_pre_key_signature)
     signed_pre_key_signature_mut[63] &= 0x7f
     signed_pre_key_signature = bytes(signed_pre_key_signature_mut)
 
-    identity_key_serialized = base64.b64decode(cast(str, cast(ET.Element, element.find(
-        f"{NS}identityKey"
-    )).text))
-
-    assert identity_key_serialized[0] == 0x05
-
-    identity_key = xeddsa.curve25519_pub_to_ed25519_pub(identity_key_serialized[1:], bool(identity_key_sign))
+    pre_key_ids = {
+        StateImpl.parse_public_key(base64.b64decode(cast(str, pkp_elt.text))):
+            int(cast(str, pkp_elt.get("preKeyId")))
+        for pkp_elt
+        in pkp_elts
+    }
 
     return BundleImpl(
         bare_jid,
         device_id,
         x3dh.Bundle(
             identity_key,
-            base64.b64decode(cast(str, spkp_elt.text)),
+            StateImpl.parse_public_key(base64.b64decode(cast(str, spkp_elt.text))),
             signed_pre_key_signature,
-            frozenset(base64.b64decode(cast(str, pkp_elt.text)) for pkp_elt in pkp_elts)
+            frozenset(pre_key_ids.keys())
         ),
         int(cast(str, spkp_elt.get("signedPreKeyId"))),
-        {
-            base64.b64decode(cast(str, pkp_elt.text)): int(cast(str, pkp_elt.get("preKeyId")))
-            for pkp_elt
-            in pkp_elts
-        }
+        pre_key_ids
     )
 
 
@@ -307,17 +312,17 @@ def serialize_message(message: Message) -> ET.Element:
             attrib={ "rid": str(encrypted_key_material.device_id) }
         )
 
-        authenticated_message = b"\x33" + encrypted_key_material.serialize()
+        authenticated_message = encrypted_key_material.serialize()
 
         if key_exchange is None:
             key_elt.text = base64.b64encode(authenticated_message).decode("ASCII")
         else:
             assert isinstance(key_exchange, KeyExchangeImpl)
 
+            key_exchange_serialized, _sign_bit_set = key_exchange.serialize(authenticated_message)
+
             key_elt.set("prekey", "true")
-            key_elt.text = base64.b64encode(
-                b"\x33" + key_exchange.serialize(authenticated_message)
-            ).decode("ASCII")
+            key_elt.text = base64.b64encode(key_exchange_serialized).decode("ASCII")
 
     if not message.content.empty:
         ET.SubElement(
@@ -333,12 +338,19 @@ def serialize_message(message: Message) -> ET.Element:
     return encrypted_elt
 
 
-def parse_message(element: ET.Element, sender_bare_jid: str, recipient_bare_jid: str) -> Message:
+async def parse_message(
+    element: ET.Element,
+    sender_bare_jid: str,
+    recipient_bare_jid: str,
+    session_manager: SessionManager
+) -> Message:
     """
     Args:
         element: The XML element to parse the message from.
         sender_bare_jid: The bare JID of the sender.
         recipient_bare_jid: The bare JID of the recipient, i.e. us.
+        session_manager: The session manager instance is required to find one piece of information that the
+            oldmemo message serialization format lacks with regards to the identity key.
 
     Returns:
         The extracted message.
@@ -347,6 +359,8 @@ def parse_message(element: ET.Element, sender_bare_jid: str, recipient_bare_jid:
         ValueError: in case there is malformed data not caught be the XML schema validation.
         XMLSchemaValidationError: in case the element does not conform to the XML schema given in the
             specification.
+        SenderNotFound: in case the public information about the sending device could not be found or is
+            incomplete.
 
     Warning:
         This version of the OMEMO specification matches key material to recipient purely by device id. The
@@ -362,6 +376,43 @@ def parse_message(element: ET.Element, sender_bare_jid: str, recipient_bare_jid:
     payload_elt = element.find(f"{NS}payload")
     header_elt = cast(ET.Element, element.find(f"{NS}header"))
     iv_elt = header_elt.find(f"{NS}iv")
+    sender_device_id = int(cast(str, header_elt.get("sid")))
+
+    # The following code might seem overkill just to find the sign of the identity key. However, to make usage
+    # of the library as simple as possible, I believe it is worth it. Since most results are cached, this
+    # shouldn't significantly slow down the overall decryption flow either.
+    sender_device = next((
+        device
+        for device
+        in await session_manager.get_device_information(sender_bare_jid)
+        if device.device_id == sender_device_id
+    ), None)
+
+    if sender_device is None:
+        try:
+            # If the device wasn't found, refresh the device list
+            await session_manager.refresh_device_list(NAMESPACE, sender_bare_jid)
+        except DeviceListDownloadFailed as e:
+            raise SenderNotFound(
+                "Couldn't find public information about the device which sent this message and an attempt to"
+                " refresh the sender's device list failed."
+            ) from e
+
+        sender_device = next((
+            device
+            for device
+            in await session_manager.get_device_information(sender_bare_jid)
+            if device.device_id == sender_device_id
+        ), None)
+
+    if sender_device is None:
+        raise SenderNotFound(
+            "Couldn't find public information about the device which sent this message. I.e. the device"
+            " either does not appear in the device list of the sending XMPP account, or the bundle of the"
+            " sending device could not be downloaded."
+        )
+
+    set_sign_bit = bool((sender_device.identity_key[31] >> 7) & 1)
 
     keys: Set[Tuple[EncryptedKeyMaterial, Optional[KeyExchange]]] = set()
 
@@ -372,19 +423,9 @@ def parse_message(element: ET.Element, sender_bare_jid: str, recipient_bare_jid:
         key_exchange: Optional[KeyExchangeImpl] = None
         authenticated_message: bytes
         if bool(key_elt.get("prekey", False)):
-            version, content = content[0], content[1:]
-
-            if version != 0x33:
-                raise Exception("Unexpected version byte.")
-
-            key_exchange, authenticated_message = KeyExchangeImpl.parse(content)
+            key_exchange, authenticated_message = KeyExchangeImpl.parse(content, set_sign_bit)
         else:
             authenticated_message = content
-
-        version, authenticated_message = authenticated_message[0], authenticated_message[1:]
-
-        if version != 0x33:
-            raise Exception("Unexpected version byte.")
 
         encrypted_key_material = EncryptedKeyMaterialImpl.parse(
             authenticated_message,
@@ -397,7 +438,7 @@ def parse_message(element: ET.Element, sender_bare_jid: str, recipient_bare_jid:
     return Message(
         NAMESPACE,
         sender_bare_jid,
-        int(cast(str, header_elt.get("sid"))),
+        sender_device_id,
         (
             ContentImpl.make_empty()
             if payload_elt is None or iv_elt is None
