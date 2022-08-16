@@ -1030,8 +1030,8 @@ class Twomemo(Backend):
             Initiation.ACTIVE,
             KeyExchangeImpl(
                 header,
-                (await self.__get_signed_pre_key_ids())[header.signed_pre_key],
-                (await self.__get_pre_key_ids())[header.pre_key]
+                bundle.signed_pre_key_id,
+                bundle.pre_key_ids[header.pre_key]
             ),
             associated_data,
             double_ratchet
