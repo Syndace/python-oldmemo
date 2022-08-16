@@ -207,30 +207,26 @@ def serialize_bundle(bundle: BundleImpl) -> ET.Element:
     ET.SubElement(
         bundle_elt,
         f"{NS}spk",
-        attrib={ "id": str(bundle.signed_pre_key_id) },
-        text=base64.b64encode(bundle.bundle.signed_pre_key).decode("ASCII")
-    )
+        attrib={ "id": str(bundle.signed_pre_key_id) }
+    ).text = base64.b64encode(bundle.bundle.signed_pre_key).decode("ASCII")
 
     ET.SubElement(
         bundle_elt,
-        f"{NS}spks",
-        text=base64.b64encode(bundle.bundle.signed_pre_key_sig).decode("ASCII")
-    )
+        f"{NS}spks"
+    ).text = base64.b64encode(bundle.bundle.signed_pre_key_sig).decode("ASCII")
 
     ET.SubElement(
         bundle_elt,
-        f"{NS}ik",
-        text=base64.b64encode(bundle.bundle.identity_key).decode("ASCII")
-    )
+        f"{NS}ik"
+    ).text = base64.b64encode(bundle.bundle.identity_key).decode("ASCII")
 
     prekeys_elt = ET.SubElement(bundle_elt, f"{NS}prekeys")
     for pre_key in bundle.bundle.pre_keys:
         ET.SubElement(
             prekeys_elt,
             f"{NS}pk",
-            attrib={ "id": str(bundle.pre_key_ids[pre_key]) },
-            text=base64.b64encode(pre_key).decode("ASCII")
-        )
+            attrib={ "id": str(bundle.pre_key_ids[pre_key]) }
+        ).text = base64.b64encode(pre_key).decode("ASCII")
 
     return bundle_elt
 
@@ -310,9 +306,8 @@ def serialize_message(message: Message) -> ET.Element:
     if not message.content.empty:
         ET.SubElement(
             encrypted_elt,
-            f"{NS}payload",
-            text=base64.b64encode(message.content.ciphertext).decode("ASCII")
-        )
+            f"{NS}payload"
+        ).text = base64.b64encode(message.content.ciphertext).decode("ASCII")
 
     return encrypted_elt
 
