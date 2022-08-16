@@ -163,11 +163,10 @@ class AEADImpl(aead_aes_hmac.AEAD):
         # Calculate and verify the authentication tag
         auth = hmac.HMAC(authentication_key, hash_function, backend=default_backend())
         auth.update(associated_data + omemo_authenticated_message.message)
+        mac = auth.finalize()[:AEADImpl.AUTHENTICATION_TAG_TRUNCATED_LENGTH]
 
-        try:
-            auth.verify(omemo_authenticated_message.mac)
-        except InvalidSignature as e:
-            raise doubleratchet.aead.AuthenticationFailedException() from e
+        if mac != omemo_authenticated_message.mac:
+            raise doubleratchet.aead.AuthenticationFailedException("Authentication tags do not match.")
 
         # Parse the OMEMOMessage contained in the OMEMOAuthenticatedMessage
         try:
