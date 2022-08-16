@@ -306,7 +306,7 @@ def serialize_message(message: Message) -> ET.Element:
             attrib={ "rid": str(encrypted_key_material.device_id) }
         )
 
-        authenticated_message = encrypted_key_material.serialize()
+        authenticated_message = b"\x33" + encrypted_key_material.serialize()
 
         if key_exchange is None:
             key_elt.text = base64.b64encode(authenticated_message).decode("ASCII")
@@ -314,7 +314,9 @@ def serialize_message(message: Message) -> ET.Element:
             assert isinstance(key_exchange, KeyExchangeImpl)
 
             key_elt.set("prekey", "true")
-            key_elt.text = base64.b64encode(key_exchange.serialize(authenticated_message)).decode("ASCII")
+            key_elt.text = base64.b64encode(
+                b"\x33" + key_exchange.serialize(authenticated_message)
+            ).decode("ASCII")
 
     if not message.content.empty:
         ET.SubElement(
@@ -369,9 +371,19 @@ def parse_message(element: ET.Element, sender_bare_jid: str, recipient_bare_jid:
         key_exchange: Optional[KeyExchangeImpl] = None
         authenticated_message: bytes
         if bool(key_elt.get("prekey", False)):
+            version, content = content[0], content[1:]
+
+            if version != 0x33:
+                raise Exception("Unexpected version byte.")
+
             key_exchange, authenticated_message = KeyExchangeImpl.parse(content)
         else:
             authenticated_message = content
+
+        version, authenticated_message = authenticated_message[0], authenticated_message[1:]
+
+        if version != 0x33:
+            raise Exception("Unexpected version byte.")
 
         encrypted_key_material = EncryptedKeyMaterialImpl.parse(
             authenticated_message,
