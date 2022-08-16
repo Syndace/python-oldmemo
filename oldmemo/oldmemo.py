@@ -89,9 +89,9 @@ class OMEMOAuthenticatedMessage(NamedTuple):
     # pylint: disable=invalid-name
     """
     The `urn:xmpp:omemo:2` version of the specification uses a protobuf structure called
-    ``OMEMOAuthenticatedMessage`` to hold and transfer a serialized :class:`OMEMOMessage` and an
-    authentication tag. This version of the specification instead uses simple concatenation of the two byte
-    strings. This class mocks the protobuf structure API to make maintaining this backend as a fork of
+    ``OMEMOAuthenticatedMessage`` to hold and transfer a serialized :class:`OMEMOMessage` in network format
+    and an authentication tag. This version of the specification instead uses simple concatenation of the two
+    byte strings. This class mocks the protobuf structure API to make maintaining this backend as a fork of
     python-twomemo easier and to make the code cleaner.
     """
 
@@ -165,10 +165,10 @@ class AEADImpl(aead_aes_hmac.AEAD):
         associated_data, header = cls.__parse_associated_data(associated_data)
 
         # Build an OMEMOMessage including the header and the ciphertext
-        omemo_message = OMEMOMessage(
+        omemo_message = b"\x33" + OMEMOMessage(
             n=header.sending_chain_length,
             pn=header.previous_sending_chain_length,
-            dh_pub=header.ratchet_pub,
+            dh_pub=StateImpl.serialize_public_key(header.ratchet_pub),
             ciphertext=ciphertext
         ).SerializeToString()
 
@@ -209,13 +209,20 @@ class AEADImpl(aead_aes_hmac.AEAD):
             raise doubleratchet.aead.AuthenticationFailedException("Authentication tags do not match.")
 
         # Parse the OMEMOMessage contained in the OMEMOAuthenticatedMessage
+        if len(omemo_authenticated_message.message) < 1 or omemo_authenticated_message.message[0] != 0x33:
+            raise doubleratchet.DecryptionFailedException("Version byte missing.")
+
         try:
-            omemo_message = OMEMOMessage.FromString(omemo_authenticated_message.message)
+            omemo_message = OMEMOMessage.FromString(omemo_authenticated_message.message[1:])
         except google.protobuf.message.DecodeError as e:
             raise doubleratchet.DecryptionFailedException() from e
 
         # Make sure that the headers match as a little additional consistency check
-        if header != doubleratchet.Header(omemo_message.dh_pub, omemo_message.pn, omemo_message.n):
+        if header != doubleratchet.Header(
+            StateImpl.parse_public_key(omemo_message.dh_pub),
+            omemo_message.pn,
+            omemo_message.n
+        ):
             raise doubleratchet.aead.AuthenticationFailedException("Header mismatch.")
 
         # Decrypt the plaintext using AES-256 (the 256 bit are implied by the key size) in CBC mode and the
@@ -263,7 +270,11 @@ class AEADImpl(aead_aes_hmac.AEAD):
 
         associated_data = associated_data[:associated_data_length]
 
-        return associated_data, doubleratchet.Header(omemo_message.dh_pub, omemo_message.pn, omemo_message.n)
+        return associated_data, doubleratchet.Header(
+            StateImpl.parse_public_key(omemo_message.dh_pub),
+            omemo_message.pn,
+            omemo_message.n
+        )
 
 
 class DoubleRatchetImpl(doubleratchet.DoubleRatchet):
@@ -277,10 +288,10 @@ class DoubleRatchetImpl(doubleratchet.DoubleRatchet):
 
     @staticmethod
     def _build_associated_data(associated_data: bytes, header: doubleratchet.Header) -> bytes:
-        return associated_data + OMEMOMessage(
+        return associated_data + OMEMOMessage(  # TODO: Do I need to prefix b"\x33" here?
             n=header.sending_chain_length,
             pn=header.previous_sending_chain_length,
-            dh_pub=header.ratchet_pub
+            dh_pub=StateImpl.serialize_public_key(header.ratchet_pub)
         ).SerializeToString()
 
 
@@ -307,6 +318,40 @@ class StateImpl(x3dh.BaseState):
         # https://github.com/signalapp/libsignal-protocol-java/blob/fde96d22004f32a391554e4991e4e1f0a14c2d50/
         # java/src/main/java/org/whispersystems/libsignal/ecc/Curve.java#L17
         return b"\x05" + pub
+
+    @staticmethod
+    def serialize_public_key(pub: bytes) -> bytes:
+        """
+        Args:
+            pub: A public key in Curve25519 format.
+
+        Returns:
+            The public key serialized in the network format.
+
+        Note:
+            This is a reexport of :meth:`_encode_public_key` with the format fixed to Curve25519.
+        """
+
+        return StateImpl._encode_public_key(x3dh.IdentityKeyFormat.CURVE_25519, pub)
+
+    @staticmethod
+    def parse_public_key(serialized: bytes) -> bytes:
+        """
+        Args:
+            serialized: A Curve25519 public key serialized in the network format, as returned by e.g.
+                :meth:`serialize_public_key`.
+
+        Returns:
+            The parsed public key in Curve25519 format.
+
+        Raises:
+            ValueError: if the input format does not comply to the expected network format.
+        """
+
+        if len(serialized) == StateImpl.IDENTITY_KEY_ENCODING_LENGTH and serialized[0] == 0x05:
+            return serialized[1:]
+
+        raise ValueError("Public key not serialized in network format.")
 
 
 class BundleImpl(Bundle):
@@ -521,11 +566,14 @@ class EncryptedKeyMaterialImpl(EncryptedKeyMaterial):
             ValueError: if the data is malformed.
         """
 
+        message_serialized = OMEMOAuthenticatedMessage.FromString(authenticated_message).message
+
+        if len(message_serialized) < 1 or message_serialized[0] != 0x33:
+            raise ValueError("Version byte missing.")
+
         # Parse the OMEMOAuthenticatedMessage and OMEMOMessage structures to extract the header.
         try:
-            message = OMEMOMessage.FromString(OMEMOAuthenticatedMessage.FromString(
-                authenticated_message
-            ).message)
+            message = OMEMOMessage.FromString(message_serialized[1:])
         except google.protobuf.message.DecodeError as e:
             raise ValueError() from e
 
@@ -533,7 +581,11 @@ class EncryptedKeyMaterialImpl(EncryptedKeyMaterial):
             bare_jid,
             device_id,
             doubleratchet.EncryptedMessage(
-                doubleratchet.Header(message.dh_pub, message.pn, message.n),
+                doubleratchet.Header(
+                    StateImpl.parse_public_key(message.dh_pub),
+                    message.pn,
+                    message.n
+                ),
                 authenticated_message
             )
         )
@@ -667,29 +719,35 @@ class KeyExchangeImpl(KeyExchange):
 
         return self.__header.signed_pre_key == b"" and self.__header.pre_key == b""
 
-    def serialize(self, authenticated_message: bytes) -> bytes:
+    def serialize(self, authenticated_message: bytes) -> Tuple[bytes, bool]:
         """
         Args:
             authenticated_message: The serialized OMEMOAuthenticatedMessage message structure to include with
                 the key exchange information.
 
         Returns:
-            A serialized OMEMOKeyExchange message structure representing the content of this instance.
+            A serialized OMEMOKeyExchange message structure in network format representing the content of this
+            instance, and a flag indicating whether the sign bit was is on the identity key in its Ed25519
+            form.
         """
 
-        return OMEMOKeyExchange(
+        return b"\x33" + OMEMOKeyExchange(
             pk_id=self.__pre_key_id,
             spk_id=self.__signed_pre_key_id,
-            ik=self.__header.identity_key,
-            ek=self.__header.ephemeral_key,
+            ik=StateImpl.serialize_public_key(xeddsa.ed25519_pub_to_curve25519_pub(
+                self.__header.identity_key
+            )),
+            ek=StateImpl.serialize_public_key(self.__header.ephemeral_key),
             message=authenticated_message
-        ).SerializeToString()
+        ).SerializeToString(), bool((self.__header.identity_key[31] >> 7) & 1)
 
     @staticmethod
-    def parse(key_exchange: bytes) -> Tuple[KeyExchangeImpl, bytes]:
+    def parse(key_exchange: bytes, set_sign_bit: bool) -> Tuple[KeyExchangeImpl, bytes]:
         """
         Args:
-            key_exchange: A serialized OMEMOKeyExchange message structure.
+            key_exchange: A serialized OMEMOKeyExchange message structure in network format.
+            set_sign_bit: Whether to set the sign bit on the identity key when converting it to its Ed25519
+                form.
 
         Returns:
             An instance of this class, parsed from the OMEMOKeyExchange, and the serialized
@@ -706,13 +764,23 @@ class KeyExchangeImpl(KeyExchange):
             whether the header is a full or a partial (network) instance.
         """
 
+        if len(key_exchange) < 1 or key_exchange[0] != 0x33:
+            raise ValueError("Version byte missing.")
+
+        key_exchange = key_exchange[1:]
+
         try:
             parsed = OMEMOKeyExchange.FromString(key_exchange)
         except google.protobuf.message.DecodeError as e:
             raise ValueError() from e
 
         return KeyExchangeImpl(
-            x3dh.Header(parsed.ik, parsed.ek, b"", b""),
+            x3dh.Header(
+                xeddsa.curve25519_pub_to_ed25519_pub(StateImpl.parse_public_key(parsed.ik), set_sign_bit),
+                StateImpl.parse_public_key(parsed.ek),
+                b"",
+                b""
+            ),
             parsed.spk_id,
             parsed.pk_id
         ), parsed.message
