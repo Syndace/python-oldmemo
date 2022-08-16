@@ -322,6 +322,7 @@ def parse_message(element: ET.Element, bare_jid: str) -> Message:
         The extracted message.
 
     Raises:
+        ValueError: in case there is malformed data not caught be the XML schema validation.
         XMLSchemaValidationError: in case the element does not conform to the XML schema given in the
             specification.
     """

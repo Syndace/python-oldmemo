@@ -20,6 +20,7 @@ from doubleratchet.recommended import (
     kdf_hkdf,
     kdf_separate_hmacs
 )
+import google.protobuf.message
 import x3dh
 import x3dh.identity_key_pair
 
@@ -154,7 +155,10 @@ class AEADImpl(aead_aes_hmac.AEAD):
         associated_data, header = cls.__parse_associated_data(associated_data)
 
         # Parse the ciphertext as an OMEMOAuthenticatedMessage
-        omemo_authenticated_message = OMEMOAuthenticatedMessage.FromString(ciphertext)
+        try:
+            omemo_authenticated_message = OMEMOAuthenticatedMessage.FromString(ciphertext)
+        except google.protobuf.message.DecodeError as e:
+            raise doubleratchet.DecryptionFailedException() from e
 
         # Calculate and verify the authentication tag
         auth = hmac.HMAC(authentication_key, hash_function, backend=default_backend())
@@ -166,7 +170,10 @@ class AEADImpl(aead_aes_hmac.AEAD):
             raise doubleratchet.aead.AuthenticationFailedException() from e
 
         # Parse the OMEMOMessage contained in the OMEMOAuthenticatedMessage
-        omemo_message = OMEMOMessage.FromString(omemo_authenticated_message.message)
+        try:
+            omemo_message = OMEMOMessage.FromString(omemo_authenticated_message.message)
+        except google.protobuf.message.DecodeError as e:
+            raise doubleratchet.DecryptionFailedException() from e
 
         # Make sure that the headers match as a little additional consistency check
         if header != doubleratchet.Header(omemo_message.dh_pub, omemo_message.pn, omemo_message.n):
@@ -221,11 +228,18 @@ class AEADImpl(aead_aes_hmac.AEAD):
 
         Returns:
             The original associated data and the header used to build it.
+
+        Raises:
+            DecryptionFailedException: if the data is malformed.
         """
 
         associated_data_length = StateImpl.IDENTITY_KEY_ENCODING_LENGTH * 2
 
-        omemo_message = OMEMOMessage.FromString(associated_data[associated_data_length:])
+        try:
+            omemo_message = OMEMOMessage.FromString(associated_data[associated_data_length:])
+        except google.protobuf.message.DecodeError as e:
+            raise doubleratchet.DecryptionFailedException() from e
+
         associated_data = associated_data[:associated_data_length]
 
         return associated_data, doubleratchet.Header(omemo_message.dh_pub, omemo_message.pn, omemo_message.n)
@@ -453,10 +467,18 @@ class EncryptedKeyMaterialImpl(EncryptedKeyMaterial):
 
         Returns:
             An instance of this class, parsed from the OMEMOAuthenticatedMessage.
+
+        Raises:
+            ValueError: if the data is malformed.
         """
 
         # Parse the OMEMOAuthenticatedMessage and OMEMOMessage structures to extract the header.
-        message = OMEMOMessage.FromString(OMEMOAuthenticatedMessage.FromString(authenticated_message).message)
+        try:
+            message = OMEMOMessage.FromString(OMEMOAuthenticatedMessage.FromString(
+                authenticated_message
+            ).message)
+        except google.protobuf.message.DecodeError as e:
+            raise ValueError() from e
 
         return EncryptedKeyMaterialImpl(
             bare_jid,
@@ -608,14 +630,22 @@ class KeyExchangeImpl(KeyExchange):
 
         Returns:
             A serialized OMEMOKeyExchange message structure representing the content of this instance.
+
+        Raises:
+            ValueError: if the serialized OMEMOAuthenticatedMessage is malformed.
         """
+
+        try:
+            authenticated_message_parsed = OMEMOAuthenticatedMessage.FromString(authenticated_message)
+        except google.protobuf.message.DecodeError as e:
+            raise ValueError() from e
 
         return OMEMOKeyExchange(
             pk_id=self.__pre_key_id,
             spk_id=self.__signed_pre_key_id,
             ik=self.__header.identity_key,
             ek=self.__header.ephemeral_key,
-            message=OMEMOAuthenticatedMessage.FromString(authenticated_message)
+            message=authenticated_message_parsed
         ).SerializeToString(True)
 
     @staticmethod
@@ -628,6 +658,9 @@ class KeyExchangeImpl(KeyExchange):
             An instance of this class, parsed from the OMEMOKeyExchange, and the serialized
             OMEMOAuthenticatedMessage extracted from the OMEMOKeyExchange.
 
+        Raises:
+            ValueError: if the data is malformed.
+
         Warning:
             The OMEMOKeyExchange message structure only contains the ids of the signed pre key and the pre key
             used for the key exchange, not the full public keys. Since the job of this method is just parsing,
@@ -636,7 +669,10 @@ class KeyExchangeImpl(KeyExchange):
             the header is filled with the public keys.
         """
 
-        parsed = OMEMOKeyExchange.FromString(key_exchange)
+        try:
+            parsed = OMEMOKeyExchange.FromString(key_exchange)
+        except google.protobuf.message.DecodeError as e:
+            raise ValueError() from e
 
         return KeyExchangeImpl(
             x3dh.Header(parsed.ik, parsed.ek, b"", b""),
