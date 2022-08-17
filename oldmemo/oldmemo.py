@@ -1246,8 +1246,8 @@ class Oldmemo(Backend):
         ).encryptor()
         ciphertext = aes.update(plaintext) + aes.finalize()  # pylint: disable=no-member
 
-        # Truncate the authentication tag to AUTHENTICATION_TAG_TRUNCATED_LENGTH bytes
-        auth_tag = aes.tag[:AEADImpl.AUTHENTICATION_TAG_TRUNCATED_LENGTH]  # pylint: disable=no-member
+        # This authentication tag is not truncated
+        auth_tag = aes.tag  # pylint: disable=no-member
 
         return ContentImpl(ciphertext, initialization_vector), PlainKeyMaterialImpl(key, auth_tag)
 
