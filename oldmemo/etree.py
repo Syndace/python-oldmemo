@@ -342,14 +342,14 @@ def serialize_message(message: Message) -> ET.Element:
 async def parse_message(
     element: ET.Element,
     sender_bare_jid: str,
-    recipient_bare_jid: str,
+    own_bare_jid: str,
     session_manager: SessionManager
 ) -> Message:
     """
     Args:
         element: The XML element to parse the message from.
         sender_bare_jid: The bare JID of the sender.
-        recipient_bare_jid: The bare JID of the recipient, i.e. us.
+        own_bare_jid: The bare JID of the XMPP account decrypting this message, i.e. us.
         session_manager: The session manager instance is required to find one piece of information that the
             oldmemo message serialization format lacks with regards to the identity key.
 
@@ -368,7 +368,7 @@ async def parse_message(
         library, however, matches by bare JID and device id. Since the XML doesn't include the bare JID, the
         structures expected by the library can't be filled correctly. Instead, to match the behaviour of the
         specification, the bare JID of all key material included in the message is assigned to
-        ``recipient_bare_jid``, i.e. our own bare JID, which achieves the desired effect of matching only on
+        ``own_bare_jid``, i.e. our own bare JID, which achieves the desired effect of matching only on
         the device id.
     """
 
@@ -430,7 +430,7 @@ async def parse_message(
 
         encrypted_key_material = EncryptedKeyMaterialImpl.parse(
             authenticated_message,
-            recipient_bare_jid,
+            own_bare_jid,
             recipient_device_id
         )
 
