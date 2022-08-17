@@ -1261,12 +1261,23 @@ class Oldmemo(Backend):
         assert isinstance(session, SessionImpl)
         assert isinstance(plain_key_material, PlainKeyMaterialImpl)
 
+        # Rebuild the associated data such that it follows the order
+        # sender identity key || recipient identity key
+        # regardless of who initiated the session. This is to conform to the undocumented behaviour of
+        # libsignal.
+        associated_data = session.associated_data
+        if session.initiation is Initiation.PASSIVE:
+            associated_data = (
+                associated_data[StateImpl.IDENTITY_KEY_ENCODING_LENGTH:]
+                + associated_data[:StateImpl.IDENTITY_KEY_ENCODING_LENGTH]
+            )
+
         return EncryptedKeyMaterialImpl(
             session.bare_jid,
             session.device_id,
             await session.double_ratchet.encrypt_message(
                 plain_key_material.key + plain_key_material.auth_tag,
-                session.associated_data
+                associated_data
             )
         )
 
@@ -1296,10 +1307,21 @@ class Oldmemo(Backend):
         assert isinstance(session, SessionImpl)
         assert isinstance(encrypted_key_material, EncryptedKeyMaterialImpl)
 
+        # Rebuild the associated data such that it follows the order
+        # sender identity key || recipient identity key
+        # regardless of who initiated the session. This is to conform to the undocumented behaviour of
+        # libsignal.
+        associated_data = session.associated_data
+        if session.initiation is Initiation.ACTIVE:
+            associated_data = (
+                associated_data[StateImpl.IDENTITY_KEY_ENCODING_LENGTH:]
+                + associated_data[:StateImpl.IDENTITY_KEY_ENCODING_LENGTH]
+            )
+
         try:
             decrypted_message = await session.double_ratchet.decrypt_message(
                 encrypted_key_material.encrypted_message,
-                session.associated_data
+                associated_data
             )
         except Exception as e:
             raise DecryptionFailed("Key material decryption failed.") from e
