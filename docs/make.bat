@@ -9,7 +9,7 @@ if "%SPHINXBUILD%" == "" (
 )
 set SOURCEDIR=.
 set BUILDDIR=_build
-set SPHINXPROJ=Twomemo
+set SPHINXPROJ=Oldmemo
 
 if "%1" == "" goto help
 
