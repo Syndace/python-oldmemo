@@ -1,7 +1,6 @@
 from .version import __version__
 from .project import project
 
-from .migrations import BoundOTPK, LegacyStorage, OwnData, Session, State, StateSuper, Trust, migrate
 from .oldmemo import Oldmemo
 
 # Fun:
@@ -13,16 +12,6 @@ __all__ = [  # pylint: disable=unused-variable
 
     # .project
     "project",
-
-    # .migrations
-    "OwnData",
-    "Trust",
-    "Session",
-    "BoundOTPK",
-    "StateSuper",
-    "State",
-    "LegacyStorage",
-    "migrate",
 
     # .oldmemo
     "Oldmemo"
