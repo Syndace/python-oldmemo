@@ -543,6 +543,13 @@ class PlainKeyMaterialImpl(PlainKeyMaterial):
 class KeyExchangeImpl(KeyExchange):
     """
     :class:`~omemo.message.KeyExchange` implementation as a simple storage type.
+
+    There are two kinds of instances:
+
+    - Completely filled instances
+    - Partially filled instances received via network
+
+    Empty fields are filled with filler values such that the data types and lengths still match expectations.
     """
 
     def __init__(self, header: x3dh.Header, signed_pre_key_id: int, pre_key_id: int) -> None:
@@ -563,7 +570,8 @@ class KeyExchangeImpl(KeyExchange):
 
     def builds_same_session(self, other: KeyExchange) -> bool:
         # The signed pre key id and pre key id are enough for uniqueness; ignoring the actual signed pre key
-        # and pre key bytes here makes it possible to compare filled headers with unfilled once.
+        # and pre key bytes here makes it possible to compare network instances with completely filled
+        # instances.
         return isinstance(other, KeyExchangeImpl) and (
             other.header.identity_key == self.header.identity_key
             and other.header.ephemeral_key == self.header.ephemeral_key
@@ -598,15 +606,16 @@ class KeyExchangeImpl(KeyExchange):
 
         return self.__pre_key_id
 
-    @property
-    def header_filled(self) -> bool:
+    def is_network_instance(self) -> bool:
         """
         Returns:
-            Whether the header stored in this instance is filled, i.e. whether the signed pre key and pre key
-            are available in addition to just their ids.
+            Returns whether this is a network instance. A network instance has all fields filled except for
+            the signed pre key and pre key byte data. The missing byte data can be restored by looking it up
+            from storage using the respective ids.
+
         """
 
-        return not (self.__header.signed_pre_key == b"" or self.__header.pre_key == b"")
+        return self.__header.signed_pre_key == b"" and self.__header.pre_key == b""
 
     def serialize(self, authenticated_message: bytes) -> bytes:
         """
@@ -1040,7 +1049,7 @@ class Twomemo(Backend):
 
         state = await self.__get_state()
 
-        if not key_exchange.header_filled:
+        if key_exchange.is_network_instance():
             # Perform lookup of the signed pre key and pre key public keys in case the header is not filled
             signed_pre_keys_by_id = { v: k for k, v in (await self.__get_signed_pre_key_ids()).items() }
             if key_exchange.signed_pre_key_id not in signed_pre_keys_by_id:
@@ -1247,8 +1256,10 @@ class Twomemo(Backend):
     async def hide_pre_key(self, session: Session) -> bool:
         assert isinstance(session, SessionImpl)
 
+        # This method is only called with KeyExchangeImpl instances that have the pre key byte data set. We do
+        # not have to worry about the field containing a filler value and the assertion is merely there to
+        # satisfy the type system.
         assert session.key_exchange.header.pre_key is not None
-        assert session.key_exchange.header_filled
 
         state = await self.__get_state()
 
@@ -1261,8 +1272,10 @@ class Twomemo(Backend):
     async def delete_pre_key(self, session: Session) -> bool:
         assert isinstance(session, SessionImpl)
 
+        # This method is only called with KeyExchangeImpl instances that have the pre key byte data set. We do
+        # not have to worry about the field containing a filler value and the assertion is merely there to
+        # satisfy the type system.
         assert session.key_exchange.header.pre_key is not None
-        assert session.key_exchange.header_filled
 
         state = await self.__get_state()
 
