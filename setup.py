@@ -59,12 +59,14 @@ setup(
     install_requires=[
         "OMEMO>=1.0.0,<2",
         "DoubleRatchet>=1.0.0,<2",
+        "X3DH>=1.0.0,<2",
+        "XEdDSA>=1.0.0,<2",
         "cryptography>=3.3.2",
         "protobuf>=3.12.4"
     ],
     extras_require={
         "xml": [
-            "xmlschema>=2.0.1"
+            "xmlschema>=2.0.2"
         ]
     },
     python_requires=">=3.7",
