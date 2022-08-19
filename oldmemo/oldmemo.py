@@ -287,7 +287,7 @@ class DoubleRatchetImpl(doubleratchet.DoubleRatchet):
 
     @staticmethod
     def _build_associated_data(associated_data: bytes, header: doubleratchet.Header) -> bytes:
-        return associated_data + OMEMOMessage(  # TODO: Do I need to prefix b"\x33" here?
+        return associated_data + OMEMOMessage(
             n=header.sending_chain_length,
             pn=header.previous_sending_chain_length,
             dh_pub=StateImpl.serialize_public_key(header.ratchet_pub)
@@ -646,12 +646,16 @@ class KeyExchangeImpl(KeyExchange):
     """
     :class:`~omemo.message.KeyExchange` implementation as a simple storage type.
 
-    There are two kinds of instances:
+    There are four kinds of instances:
 
     - Completely filled instances
     - Partially filled instances received via network
+    - Very sparsely filled instances migrated from the legacy storage format
+    - Almost completely empty instances migrated from the legacy storage format
 
     Empty fields are filled with filler values such that the data types and lengths still match expectations.
+    The fourth kind, almost completely empty instances, will never have any of their methods called except for
+    getters.
     """
 
     def __init__(self, header: x3dh.Header, signed_pre_key_id: int, pre_key_id: int) -> None:
@@ -671,15 +675,27 @@ class KeyExchangeImpl(KeyExchange):
         return self.__header.identity_key
 
     def builds_same_session(self, other: KeyExchange) -> bool:
-        # The signed pre key id and pre key id are enough for uniqueness; ignoring the actual signed pre key
-        # and pre key bytes here makes it possible to compare network instances with completely filled
-        # instances.
-        return isinstance(other, KeyExchangeImpl) and (
-            other.header.identity_key == self.header.identity_key
-            and other.header.ephemeral_key == self.header.ephemeral_key
-            and other.signed_pre_key_id == self.signed_pre_key_id
-            and other.pre_key_id == self.pre_key_id
-        )
+        if isinstance(other, KeyExchangeImpl):
+            if self.is_migrated_instance() or other.is_migrated_instance():
+                # If any of the instances is a migrated instance, we can only compare the identity key and the
+                # pre key id. Sadly that's the only data included in the legacy storage format, next to the
+                # pre key byte data, which doesn't add any value.
+                return (
+                    other.header.identity_key == self.header.identity_key
+                    and other.pre_key_id == self.pre_key_id
+                )
+
+            # Otherwise, we are dealing with completely filled instances or network instances. The signed pre
+            # key id and pre key id are enough for uniqueness; ignoring the actual signed pre key and pre key
+            # bytes here makes it possible to compare network instances with completely filled instances.
+            return (
+                other.header.identity_key == self.header.identity_key
+                and other.header.ephemeral_key == self.header.ephemeral_key
+                and other.signed_pre_key_id == self.signed_pre_key_id
+                and other.pre_key_id == self.pre_key_id
+            )
+
+        return False
 
     @property
     def header(self) -> x3dh.Header:
@@ -717,6 +733,17 @@ class KeyExchangeImpl(KeyExchange):
         """
 
         return self.__header.signed_pre_key == b"" and self.__header.pre_key == b""
+
+    def is_migrated_instance(self) -> bool:
+        """
+        Returns:
+            Whether this is a migrated instance, according to the third kind as described in the class
+            docstring. A migrated instance of that kind only sets the identity key, the pre key id and the pre
+            key byte data. Other values are fillers.
+        """
+
+        # Could confirm the other values here too, but why the trouble.
+        return self.__signed_pre_key_id == -1 and self.__pre_key_id != -1
 
     def serialize(self, authenticated_message: bytes) -> Tuple[bytes, bool]:
         """
@@ -1165,6 +1192,8 @@ class Oldmemo(Backend):
 
         state = await self.__get_state()
 
+        # The key exchange can be a network instance here, but it can't be a migrated instance, so we don't
+        # have to worry about that here.
         if key_exchange.is_network_instance():
             # Perform lookup of the signed pre key and pre key public keys in case the header is not filled
             signed_pre_keys_by_id = { v: k for k, v in (await self.__get_signed_pre_key_ids()).items() }
