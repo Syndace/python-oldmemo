@@ -561,28 +561,15 @@ class KeyExchangeImpl(KeyExchange):
     def identity_key(self) -> bytes:
         return self.__header.identity_key
 
-    def __eq__(self, other: object) -> bool:
-        if isinstance(other, KeyExchangeImpl):
-            # The signed pre key id and pre key id are enough for uniqueness; ignoring them here makes it
-            # possible to compare filled headers with unfilled once.
-            return (
-                other.header.identity_key == self.header.identity_key
-                and other.header.ephemeral_key == self.header.ephemeral_key
-                and other.signed_pre_key_id == self.signed_pre_key_id
-                and other.pre_key_id == self.pre_key_id
-            )
-
-        return False
-
-    def __hash__(self) -> int:
-        # The signed pre key id and pre key id are enough for uniqueness; ignoring them here makes it possible
-        # to compare filled headers with unfilled once.
-        return hash((
-            self.header.identity_key,
-            self.header.ephemeral_key,
-            self.signed_pre_key_id,
-            self.pre_key_id
-        ))
+    def builds_same_session(self, other: KeyExchange) -> bool:
+        # The signed pre key id and pre key id are enough for uniqueness; ignoring the actual signed pre key
+        # and pre key bytes here makes it possible to compare filled headers with unfilled once.
+        return isinstance(other, KeyExchangeImpl) and (
+            other.header.identity_key == self.header.identity_key
+            and other.header.ephemeral_key == self.header.ephemeral_key
+            and other.signed_pre_key_id == self.signed_pre_key_id
+            and other.pre_key_id == self.pre_key_id
+        )
 
     @property
     def header(self) -> x3dh.Header:
