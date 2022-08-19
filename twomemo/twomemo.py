@@ -612,7 +612,6 @@ class KeyExchangeImpl(KeyExchange):
             Returns whether this is a network instance. A network instance has all fields filled except for
             the signed pre key and pre key byte data. The missing byte data can be restored by looking it up
             from storage using the respective ids.
-
         """
 
         return self.__header.signed_pre_key == b"" and self.__header.pre_key == b""
