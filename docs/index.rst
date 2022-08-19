@@ -6,4 +6,5 @@ Backend implementation for `python-omemo <https://github.com/Syndace/python-omem
 .. toctree::
     installation
     getting_started
+    migration_from_legacy
     API Documentation <oldmemo/package>
