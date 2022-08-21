@@ -5,7 +5,6 @@ import base64
 import secrets
 from typing import Dict, Optional, Tuple, cast
 
-from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes, hmac
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
@@ -1193,12 +1192,14 @@ class Twomemo(Backend):
         initialization_vector = key_material[64:]
 
         # Calculate and verify the authentication tag
-        new_auth = hmac.HMAC(authentication_key, hashes.SHA256(), backend=default_backend())
-        new_auth.update(content.ciphertext)
-        try:
-            new_auth.verify(plain_key_material.auth_tag)
-        except InvalidSignature as e:
-            raise DecryptionFailed("Authentication tag verification failed.") from e
+        auth = hmac.HMAC(authentication_key, hashes.SHA256(), backend=default_backend())
+        auth.update(content.ciphertext)
+
+        # Truncate the authentication tag to AUTHENTICATION_TAG_TRUNCATED_LENGTH bytes
+        auth_tag = auth.finalize()[:AEADImpl.AUTHENTICATION_TAG_TRUNCATED_LENGTH]
+
+        if auth_tag != plain_key_material.auth_tag:
+            raise DecryptionFailed("Authentication tag verification failed.")
 
         # Decrypt the plaintext using AES-256 (the 256 bit are implied by the key size) in CBC mode and the
         # previously created key and IV
