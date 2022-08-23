@@ -3,7 +3,8 @@ from __future__ import annotations  # pylint: disable=unused-variable
 
 from abc import ABC, abstractmethod
 import base64
-from typing import Awaitable, Callable, Dict, List, Optional, Set, TypedDict
+from typing import Awaitable, Callable, Dict, List, Optional, Set
+from typing_extensions import TypedDict
 
 import doubleratchet
 import omemo
