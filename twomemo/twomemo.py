@@ -4,6 +4,7 @@ from __future__ import annotations  # pylint: disable=unused-variable
 import base64
 import secrets
 from typing import Dict, Optional, Tuple, cast
+from typing_extensions import Final
 
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes, hmac
@@ -56,7 +57,7 @@ __all__ = [  # pylint: disable=unused-variable
 ]
 
 
-NAMESPACE = "urn:xmpp:omemo:2"
+NAMESPACE: Final = "urn:xmpp:omemo:2"
 
 
 class RootChainKDFImpl(kdf_hkdf.KDF):
@@ -93,7 +94,7 @@ class AEADImpl(aead_aes_hmac.AEAD):
     associated data.
     """
 
-    AUTHENTICATION_TAG_TRUNCATED_LENGTH = 16
+    AUTHENTICATION_TAG_TRUNCATED_LENGTH: Final = 16
 
     @staticmethod
     def _get_hash_function() -> HashFunction:
@@ -248,7 +249,7 @@ class DoubleRatchetImpl(doubleratchet.DoubleRatchet):
     The Double Ratchet implementation used by this version of the specification.
     """
 
-    MESSAGE_CHAIN_CONSTANT = b"\x02\x01"
+    MESSAGE_CHAIN_CONSTANT: Final = b"\x02\x01"
 
     @staticmethod
     def _build_associated_data(associated_data: bytes, header: doubleratchet.Header) -> bytes:
@@ -264,8 +265,8 @@ class StateImpl(x3dh.BaseState):
     The X3DH state implementation used by this version of the specification.
     """
 
-    INFO = "OMEMO X3DH".encode("ASCII")
-    IDENTITY_KEY_ENCODING_LENGTH = 32
+    INFO: Final = "OMEMO X3DH".encode("ASCII")
+    IDENTITY_KEY_ENCODING_LENGTH: Final = 32
 
     @staticmethod
     def _encode_public_key(key_format: x3dh.IdentityKeyFormat, pub: bytes) -> bytes:
@@ -493,7 +494,7 @@ class PlainKeyMaterialImpl(PlainKeyMaterial):
     :class:`~omemo.message.PlainKeyMaterial` implementation as a simple storage type.
     """
 
-    KEY_LENGTH = 32
+    KEY_LENGTH: Final = 32
 
     def __init__(self, key: bytes, auth_tag: bytes) -> None:
         """
