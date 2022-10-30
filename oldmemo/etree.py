@@ -324,12 +324,12 @@ def serialize_message(message: Message) -> ET.Element:
             key_elt.set("prekey", "true")
             key_elt.text = base64.b64encode(key_exchange_serialized).decode("ASCII")
 
-    if not message.content.empty:
-        ET.SubElement(
-            header_elt,
-            f"{NS}iv"
-        ).text = base64.b64encode(message.content.initialization_vector).decode("ASCII")
+    ET.SubElement(
+        header_elt,
+        f"{NS}iv"
+    ).text = base64.b64encode(message.content.initialization_vector).decode("ASCII")
 
+    if not message.content.empty:
         ET.SubElement(
             encrypted_elt,
             f"{NS}payload"
