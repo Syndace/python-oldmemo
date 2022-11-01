@@ -17,8 +17,8 @@ install:
 - python -m pip install --upgrade pip setuptools wheel
 - python -m pip --version
 - python -m pip install --upgrade pytest pytest-asyncio pylint flake8
-- if [   $DEBIAN_DEPS ]; then python -m pip install --upgrade cryptography==3.3.2 protobuf==3.12.4; fi
-- if [ ! $DEBIAN_DEPS ]; then python -m pip install --upgrade cryptography        protobuf; fi
+- if [   $DEBIAN_DEPS ]; then python -m pip install --upgrade protobuf==3.12.4; fi
+- if [ ! $DEBIAN_DEPS ]; then python -m pip install --upgrade protobuf; fi
 - if [ "$TRAVIS_PYTHON_VERSION" != "pypy3" ]; then python -m pip install --upgrade mypy mypy-protobuf types-protobuf; fi
 - python -m pip install .
 

@@ -6,12 +6,6 @@ import secrets
 from typing import Dict, Optional, Tuple, cast
 from typing_extensions import Final
 
-from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives import hashes, hmac
-from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
-from cryptography.hazmat.primitives.kdf.hkdf import HKDF
-from cryptography.hazmat.primitives.padding import PKCS7
-
 import doubleratchet
 from doubleratchet.recommended import (
     aead_aes_hmac,
@@ -1092,38 +1086,33 @@ class Twomemo(Backend):
         key = secrets.token_bytes(PlainKeyMaterialImpl.KEY_LENGTH)
 
         # Derive 80 bytes from the key using HKDF-SHA-256
-        key_material = HKDF(
-            algorithm=hashes.SHA256(),
+        key_material = await CryptoProviderImpl.hkdf_derive(
+            hash_function=HashFunction.SHA_256,
             length=80,
             salt=b"\x00" * 32,
             info="OMEMO Payload".encode("ASCII"),
-            backend=default_backend()
-        ).derive(key)
+            key_material=key
+        )
 
         # Split those 80 bytes into an encryption key, authentication key and an initialization vector
         encryption_key = key_material[:32]
         authentication_key = key_material[32:64]
         initialization_vector = key_material[64:]
 
-        # Prepare PKCS#7 padded plaintext
-        padder = PKCS7(128).padder()
-        padded_plaintext = padder.update(plaintext) + padder.finalize()
-
         # Encrypt the plaintext using AES-256 (the 256 bit are implied by the key size) in CBC mode and the
-        # previously created key and IV
-        aes = Cipher(
-            algorithms.AES(encryption_key),
-            modes.CBC(initialization_vector),
-            backend=default_backend()
-        ).encryptor()
-        ciphertext = aes.update(padded_plaintext) + aes.finalize()  # pylint: disable=no-member
+        # previously created key and IV, after padding it with PKCS#7
+        ciphertext = await CryptoProviderImpl.aes_cbc_encrypt(
+            encryption_key,
+            initialization_vector,
+            plaintext
+        )
 
-        # Calculate the authentication tag
-        auth = hmac.HMAC(authentication_key, hashes.SHA256(), backend=default_backend())
-        auth.update(ciphertext)
-
-        # Truncate the authentication tag to AUTHENTICATION_TAG_TRUNCATED_LENGTH bytes
-        auth_tag = auth.finalize()[:AEADImpl.AUTHENTICATION_TAG_TRUNCATED_LENGTH]
+        # Calculate the authentication tag and truncate it to AUTHENTICATION_TAG_TRUNCATED_LENGTH bytes
+        auth_tag = (await CryptoProviderImpl.hmac_calculate(
+            authentication_key,
+            HashFunction.SHA_256,
+            ciphertext
+        ))[:AEADImpl.AUTHENTICATION_TAG_TRUNCATED_LENGTH]
 
         return ContentImpl(ciphertext), PlainKeyMaterialImpl(key, auth_tag)
 
@@ -1154,47 +1143,37 @@ class Twomemo(Backend):
         assert not content.empty
 
         # Derive 80 bytes from the key using HKDF-SHA-256
-        key_material = HKDF(
-            algorithm=hashes.SHA256(),
+        key_material = await CryptoProviderImpl.hkdf_derive(
+            hash_function=HashFunction.SHA_256,
             length=80,
             salt=b"\x00" * 32,
             info="OMEMO Payload".encode("ASCII"),
-            backend=default_backend()
-        ).derive(plain_key_material.key)
+            key_material=plain_key_material.key
+        )
 
         # Split those 80 bytes into an encryption key, authentication key and an initialization vector
         decryption_key = key_material[:32]
         authentication_key = key_material[32:64]
         initialization_vector = key_material[64:]
 
-        # Calculate and verify the authentication tag
-        auth = hmac.HMAC(authentication_key, hashes.SHA256(), backend=default_backend())
-        auth.update(content.ciphertext)
-
-        # Truncate the authentication tag to AUTHENTICATION_TAG_TRUNCATED_LENGTH bytes
-        auth_tag = auth.finalize()[:AEADImpl.AUTHENTICATION_TAG_TRUNCATED_LENGTH]
+        # Calculate and verify the authentication tag after truncating it to
+        # AUTHENTICATION_TAG_TRUNCATED_LENGTH bytes
+        auth_tag = (await CryptoProviderImpl.hmac_calculate(
+            authentication_key,
+            HashFunction.SHA_256,
+            content.ciphertext
+        ))[:AEADImpl.AUTHENTICATION_TAG_TRUNCATED_LENGTH]
 
         if auth_tag != plain_key_material.auth_tag:
             raise DecryptionFailed("Authentication tag verification failed.")
 
         # Decrypt the plaintext using AES-256 (the 256 bit are implied by the key size) in CBC mode and the
-        # previously created key and IV
-        aes = Cipher(
-            algorithms.AES(decryption_key),
-            modes.CBC(initialization_vector),
-            backend=default_backend()
-        ).decryptor()
-        try:
-            padded_plaintext = aes.update(content.ciphertext) + aes.finalize()  # pylint: disable=no-member
-        except ValueError as e:
-            raise DecryptionFailed("Ciphertext decryption failed.") from e
-
-        # Remove the PKCS#7 padding from the plaintext
-        unpadder = PKCS7(128).unpadder()
-        try:
-            return unpadder.update(padded_plaintext) + unpadder.finalize()
-        except ValueError as e:
-            raise DecryptionFailed("Plaintext unpadding failed.") from e
+        # previously created key and IV, and unpad the resulting plaintext with PKCS#7
+        return await CryptoProviderImpl.aes_cbc_decrypt(
+            decryption_key,
+            initialization_vector,
+            content.ciphertext
+        )
 
     async def decrypt_key_material(
         self,
