@@ -20,6 +20,7 @@ from doubleratchet.recommended import (
     kdf_hkdf,
     kdf_separate_hmacs
 )
+from doubleratchet.recommended.crypto_provider_impl import CryptoProviderImpl
 import google.protobuf.message
 import x3dh
 import x3dh.identity_key_pair
@@ -105,23 +106,14 @@ class AEADImpl(aead_aes_hmac.AEAD):
         return "OMEMO Message Key Material".encode("ASCII")
 
     @classmethod
-    def encrypt(cls, plaintext: bytes, key: bytes, associated_data: bytes) -> bytes:
-        hash_function = cls._get_hash_function().as_cryptography
+    async def encrypt(cls, plaintext: bytes, key: bytes, associated_data: bytes) -> bytes:
+        hash_function = cls._get_hash_function()
 
-        encryption_key, authentication_key, iv = cls.__derive(key, hash_function, cls._get_info())
-
-        # Prepare PKCS#7 padded plaintext
-        padder = PKCS7(128).padder()
-        padded_plaintext = padder.update(plaintext) + padder.finalize()
+        encryption_key, authentication_key, iv = await cls.__derive(key, hash_function, cls._get_info())
 
         # Encrypt the plaintext using AES-256 (the 256 bit are implied by the key size) in CBC mode and the
-        # previously created key and IV
-        aes = Cipher(
-            algorithms.AES(encryption_key),
-            modes.CBC(iv),
-            backend=default_backend()
-        ).encryptor()
-        ciphertext = aes.update(padded_plaintext) + aes.finalize()  # pylint: disable=no-member
+        # previously created key and IV, after padding it with PKCS#7
+        ciphertext = await CryptoProviderImpl.aes_cbc_encrypt(encryption_key, iv, plaintext)
 
         # Parse the associated data
         associated_data, header = cls.__parse_associated_data(associated_data)
@@ -134,22 +126,22 @@ class AEADImpl(aead_aes_hmac.AEAD):
             ciphertext=ciphertext
         ).SerializeToString(True)
 
-        # Calculate the authentication tag over the associated data and the OMEMOMessage
-        auth = hmac.HMAC(authentication_key, hash_function, backend=default_backend())
-        auth.update(associated_data + omemo_message)
+        # Calculate the authentication tag over the associated data and the OMEMOMessage, truncate the
+        # authentication tag to AUTHENTICATION_TAG_TRUNCATED_LENGTH bytes
+        auth = (await CryptoProviderImpl.hmac_calculate(
+            authentication_key,
+            hash_function,
+            associated_data + omemo_message
+        ))[:AEADImpl.AUTHENTICATION_TAG_TRUNCATED_LENGTH]
 
-        # Truncate the authentication tag to AUTHENTICATION_TAG_TRUNCATED_LENGTH bytes and serialize it with
-        # the OMEMOMessage in an OMEMOAuthenticatedMessage.
-        return OMEMOAuthenticatedMessage(
-            mac=auth.finalize()[:AEADImpl.AUTHENTICATION_TAG_TRUNCATED_LENGTH],
-            message=omemo_message
-        ).SerializeToString(True)
+        # Serialize the authentication tag with the OMEMOMessage in an OMEMOAuthenticatedMessage.
+        return OMEMOAuthenticatedMessage(mac=auth, message=omemo_message).SerializeToString(True)
 
     @classmethod
-    def decrypt(cls, ciphertext: bytes, key: bytes, associated_data: bytes) -> bytes:
-        hash_function = cls._get_hash_function().as_cryptography
+    async def decrypt(cls, ciphertext: bytes, key: bytes, associated_data: bytes) -> bytes:
+        hash_function = cls._get_hash_function()
 
-        decryption_key, authentication_key, iv = cls.__derive(key, hash_function, cls._get_info())
+        decryption_key, authentication_key, iv = await cls.__derive(key, hash_function, cls._get_info())
 
         # Parse the associated data
         associated_data, header = cls.__parse_associated_data(associated_data)
@@ -161,11 +153,13 @@ class AEADImpl(aead_aes_hmac.AEAD):
             raise doubleratchet.DecryptionFailedException() from e
 
         # Calculate and verify the authentication tag
-        auth = hmac.HMAC(authentication_key, hash_function, backend=default_backend())
-        auth.update(associated_data + omemo_authenticated_message.message)
-        mac = auth.finalize()[:AEADImpl.AUTHENTICATION_TAG_TRUNCATED_LENGTH]
+        new_auth = (await CryptoProviderImpl.hmac_calculate(
+            authentication_key,
+            hash_function,
+            associated_data + ciphertext
+        ))[:AEADImpl.AUTHENTICATION_TAG_TRUNCATED_LENGTH]
 
-        if mac != omemo_authenticated_message.mac:
+        if new_auth != omemo_authenticated_message.mac:
             raise doubleratchet.aead.AuthenticationFailedException("Authentication tags do not match.")
 
         # Parse the OMEMOMessage contained in the OMEMOAuthenticatedMessage
@@ -179,40 +173,22 @@ class AEADImpl(aead_aes_hmac.AEAD):
             raise doubleratchet.aead.AuthenticationFailedException("Header mismatch.")
 
         # Decrypt the plaintext using AES-256 (the 256 bit are implied by the key size) in CBC mode and the
-        # previously created key and IV
-        try:
-            aes = Cipher(
-                algorithms.AES(decryption_key),
-                modes.CBC(iv),
-                backend=default_backend()
-            ).decryptor()
-            padded_plaintext = aes.update(omemo_message.ciphertext)  # pylint: disable=no-member
-            padded_plaintext += aes.finalize()  # pylint: disable=no-member
-        except ValueError as e:
-            raise doubleratchet.aead.DecryptionFailedException("Decryption failed.") from e
-
-        # Remove the PKCS#7 padding from the plaintext
-        try:
-            unpadder = PKCS7(128).unpadder()
-            plaintext = unpadder.update(padded_plaintext) + unpadder.finalize()
-        except ValueError as e:
-            raise doubleratchet.aead.DecryptionFailedException("Plaintext padded incorrectly.") from e
-
-        return plaintext
+        # previously created key and IV, and unpad the resulting plaintext with PKCS#7
+        return await CryptoProviderImpl.aes_cbc_decrypt(decryption_key, iv, omemo_message.ciphertext)
 
     @staticmethod
-    def __derive(key: bytes, hash_function: hashes.HashAlgorithm, info: bytes) -> Tuple[bytes, bytes, bytes]:
+    async def __derive(key: bytes, hash_function: HashFunction, info: bytes) -> Tuple[bytes, bytes, bytes]:
         # Prepare the salt, a zero-filled byte sequence with the size of the hash digest
-        salt = b"\x00" * hash_function.digest_size
+        salt = b"\x00" * hash_function.hash_size
 
         # Derive 80 bytes
-        hkdf_out = HKDF(
-            algorithm=hash_function,
+        hkdf_out = await CryptoProviderImpl.hkdf_derive(
+            hash_function=hash_function,
             length=80,
             salt=salt,
             info=info,
-            backend=default_backend()
-        ).derive(key)
+            key_material=key
+        )
 
         # Split these 80 bytes into three parts
         return hkdf_out[:32], hkdf_out[32:64], hkdf_out[64:]
@@ -997,15 +973,14 @@ class Twomemo(Backend):
         assert isinstance(plain_key_material, PlainKeyMaterialImpl)
 
         try:
-            shared_secret, associated_data, header = (await self.__get_state()).get_shared_secret_active(
-                bundle.bundle
-            )
+            state = await self.__get_state()
+            shared_secret, associated_data, header = await state.get_shared_secret_active(bundle.bundle)
         except x3dh.KeyAgreementException as e:
             raise KeyExchangeFailed() from e
 
         assert header.pre_key is not None
 
-        double_ratchet, encrypted_message = DoubleRatchetImpl.encrypt_initial_message(
+        double_ratchet, encrypted_message = await DoubleRatchetImpl.encrypt_initial_message(
             diffie_hellman_ratchet_curve25519.DiffieHellmanRatchet,
             RootChainKDFImpl,
             MessageChainKDFImpl,
@@ -1071,14 +1046,14 @@ class Twomemo(Backend):
             )
 
         try:
-            shared_secret, associated_data, signed_pre_key = state.get_shared_secret_passive(
+            shared_secret, associated_data, signed_pre_key = await state.get_shared_secret_passive(
                 key_exchange.header
             )
         except x3dh.KeyAgreementException as e:
             raise KeyExchangeFailed() from e
 
         try:
-            double_ratchet, decrypted_message = DoubleRatchetImpl.decrypt_initial_message(
+            double_ratchet, decrypted_message = await DoubleRatchetImpl.decrypt_initial_message(
                 diffie_hellman_ratchet_curve25519.DiffieHellmanRatchet,
                 RootChainKDFImpl,
                 MessageChainKDFImpl,
@@ -1166,7 +1141,7 @@ class Twomemo(Backend):
         return EncryptedKeyMaterialImpl(
             session.bare_jid,
             session.device_id,
-            session.double_ratchet.encrypt_message(
+            await session.double_ratchet.encrypt_message(
                 plain_key_material.key + plain_key_material.auth_tag,
                 session.associated_data
             )
@@ -1230,7 +1205,7 @@ class Twomemo(Backend):
         assert isinstance(encrypted_key_material, EncryptedKeyMaterialImpl)
 
         try:
-            decrypted_message = session.double_ratchet.decrypt_message(
+            decrypted_message = await session.double_ratchet.decrypt_message(
                 encrypted_key_material.encrypted_message,
                 session.associated_data
             )
