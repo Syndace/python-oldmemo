@@ -1,7 +1,7 @@
 [![PyPI](https://img.shields.io/pypi/v/Twomemo.svg)](https://pypi.org/project/Twomemo/)
 [![PyPI - Python Version](https://img.shields.io/pypi/pyversions/Twomemo.svg)](https://pypi.org/project/Twomemo/)
 [![Build Status](https://github.com/Syndace/python-twomemo/actions/workflows/test-on-push.yml/badge.svg)](https://github.com/Syndace/python-twomemo/actions/workflows/test-on-push.yml)
-[![Documentation Status](https://readthedocs.org/projects/python-twomemo/badge/?version=latest)](https://python-twomemo.readthedocs.io/en/latest/?badge=latest)
+[![Documentation Status](https://readthedocs.org/projects/python-twomemo/badge/?version=latest)](https://python-twomemo.readthedocs.io/)
 
 # python-twomemo #
 
@@ -37,4 +37,4 @@ $ flake8 twomemo/ setup.py
 
 ## Getting Started ##
 
-Refer to the documentation on [readthedocs.io](https://python-twomemo.readthedocs.io/en/latest/), or build/view it locally in the `docs/` directory. To build the docs locally, install the requirements listed in `docs/requirements.txt`, e.g. using `pip install -r docs/requirements.txt`, and then run `make html` from within the `docs/` directory. The documentation can then be found in `docs/_build/html/`.
+Refer to the documentation on [readthedocs.io](https://python-twomemo.readthedocs.io/), or build/view it locally in the `docs/` directory. To build the docs locally, install the requirements listed in `docs/requirements.txt`, e.g. using `pip install -r docs/requirements.txt`, and then run `make html` from within the `docs/` directory. The documentation can then be found in `docs/_build/html/`.
