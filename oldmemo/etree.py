@@ -67,20 +67,20 @@ BUNDLE_SCHEMA = xmlschema.XMLSchema("""<?xml version="1.0" encoding="utf8"?>
     <xs:element name="signedPreKeyPublic">
         <xs:complexType>
             <xs:simpleContent>
-                <xs:extension base='xs:base64Binary'>
+                <xs:extension base="xs:base64Binary">
                     <xs:attribute name="signedPreKeyId" type="xs:unsignedInt"/>
                 </xs:extension>
             </xs:simpleContent>
         </xs:complexType>
     </xs:element>
 
-    <xs:element name='signedPreKeySignature' type='xs:base64Binary'/>
-    <xs:element name='identityKey' type='xs:base64Binary'/>
+    <xs:element name="signedPreKeySignature" type="xs:base64Binary"/>
+    <xs:element name="identityKey" type="xs:base64Binary"/>
 
     <xs:element name="preKeyPublic">
         <xs:complexType>
             <xs:simpleContent>
-                <xs:extension base='xs:base64Binary'>
+                <xs:extension base="xs:base64Binary">
                     <xs:attribute name="preKeyId" type="xs:unsignedInt" use="required"/>
                 </xs:extension>
             </xs:simpleContent>
@@ -109,18 +109,17 @@ BUNDLE_SCHEMA = xmlschema.XMLSchema("""<?xml version="1.0" encoding="utf8"?>
 """)
 
 
-MESSAGE_SCHEMA = xmlschema.XMLSchema("""<?xml version="1.0" encoding="utf8"?>
+MESSAGE_SCHEMA = xmlschema.XMLSchema11("""<?xml version="1.1" encoding="utf8"?>
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
     targetNamespace="eu.siacs.conversations.axolotl"
     xmlns="eu.siacs.conversations.axolotl">
 
     <xs:element name="payload" type="xs:base64Binary"/>
-    <xs:element name="iv" type="xs:base64Binary"/>
 
     <xs:element name="key">
         <xs:complexType>
             <xs:simpleContent>
-                <xs:extension base='xs:base64Binary'>
+                <xs:extension base="xs:base64Binary">
                     <xs:attribute name="rid" type="xs:unsignedInt" use="required"/>
                     <xs:attribute name="prekey" type="xs:boolean"/>
                 </xs:extension>
@@ -130,11 +129,10 @@ MESSAGE_SCHEMA = xmlschema.XMLSchema("""<?xml version="1.0" encoding="utf8"?>
 
     <xs:element name="header">
         <xs:complexType>
-            <xs:sequence>
+            <xs:all>
                 <xs:element ref="key" minOccurs="0" maxOccurs="unbounded"/>
                 <xs:element ref="iv"/>
-                <xs:element ref="key" minOccurs="0" maxOccurs="unbounded"/>
-            </xs:sequence>
+            </xs:all>
             <xs:attribute name="sid" type="xs:unsignedInt"/>
         </xs:complexType>
     </xs:element>
