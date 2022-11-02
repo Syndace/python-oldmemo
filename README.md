@@ -1,6 +1,6 @@
 [![PyPI](https://img.shields.io/pypi/v/Twomemo.svg)](https://pypi.org/project/Twomemo/)
 [![PyPI - Python Version](https://img.shields.io/pypi/pyversions/Twomemo.svg)](https://pypi.org/project/Twomemo/)
-[![Build Status](https://travis-ci.org/Syndace/python-twomemo.svg?branch=main)](https://travis-ci.org/Syndace/python-twomemo)
+[![Build Status](https://github.com/Syndace/python-twomemo/actions/workflows/test-on-push.yml/badge.svg)](https://github.com/Syndace/python-twomemo/actions/workflows/test-on-push.yml)
 [![Documentation Status](https://readthedocs.org/projects/python-twomemo/badge/?version=latest)](https://python-twomemo.readthedocs.io/en/latest/?badge=latest)
 
 # python-twomemo #
@@ -24,16 +24,15 @@ $ protoc --python_out=twomemo/ --mypy_out=twomemo/ twomemo.proto
 
 This will generate `twomemo/twomemo_pb2.py` and `twomemo/twomemo_pb2.pyi`.
 
-## Testing, Type Checks and Linting ##
+## Type Checks and Linting ##
 
-python-twomemo uses [pytest](https://docs.pytest.org/en/latest/) as its testing framework, [mypy](http://mypy-lang.org/) for static type checks and both [pylint](https://pylint.pycqa.org/en/latest/) and [Flake8](https://flake8.pycqa.org/en/latest/) for linting. All tests/checks can be run locally with the following commands:
+python-twomemo uses [mypy](http://mypy-lang.org/) for static type checks and both [pylint](https://pylint.pycqa.org/en/latest/) and [Flake8](https://flake8.pycqa.org/en/latest/) for linting. All checks can be run locally with the following commands:
 
 ```sh
-$ pip install --upgrade pytest pytest-asyncio mypy pylint flake8 mypy-protobuf types-protobuf
-$ mypy --strict twomemo/ setup.py tests/
-$ pylint twomemo/ setup.py tests/
-$ flake8 twomemo/ setup.py tests/
-$ pytest
+$ pip install --upgrade mypy pylint flake8 mypy-protobuf types-protobuf
+$ mypy --strict twomemo/ setup.py
+$ pylint twomemo/ setup.py
+$ flake8 twomemo/ setup.py
 ```
 
 ## Getting Started ##
