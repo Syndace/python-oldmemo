@@ -1340,9 +1340,10 @@ class Twomemo(Backend):
         new_signed_pre_key_ids: Dict[bytes, int] = {}
 
         # Assign the next highest id to the signed pre key, if there is no id assigned to it yet.
+        signed_pre_key_id_counter += 1
         new_signed_pre_key_ids[signed_pre_key] = signed_pre_key_ids.get(
             signed_pre_key,
-            signed_pre_key_id_counter := signed_pre_key_id_counter + 1
+            signed_pre_key_id_counter
         )
 
         # Assign the next highest id to the old signed pre key, if there is no id assigned to it yet. This
@@ -1350,9 +1351,10 @@ class Twomemo(Backend):
         # (non-old) signed pre key, however there might be edge cases of the signed pre key rotating twice
         # before the assigned ids are updated.
         if old_signed_pre_key is not None:
+            signed_pre_key_id_counter += 1
             new_signed_pre_key_ids[old_signed_pre_key] = signed_pre_key_ids.get(
                 old_signed_pre_key,
-                signed_pre_key_id_counter := signed_pre_key_id_counter + 1
+                signed_pre_key_id_counter
             )
 
         # If the ids have changed, store them
@@ -1396,7 +1398,8 @@ class Twomemo(Backend):
 
         # Assign the next highest id to each pre key if there is no existing id assigned to it
         for pre_key in pre_keys:
-            new_pre_key_ids[pre_key] = pre_key_ids.get(pre_key, pre_key_id_counter := pre_key_id_counter + 1)
+            pre_key_id_counter += 1
+            new_pre_key_ids[pre_key] = pre_key_ids.get(pre_key, pre_key_id_counter)
 
         # If the ids have changed, store them
         if new_pre_key_ids != pre_key_ids:
