@@ -150,7 +150,7 @@ class AEADImpl(aead_aes_hmac.AEAD):
         new_auth = (await CryptoProviderImpl.hmac_calculate(
             authentication_key,
             hash_function,
-            associated_data + ciphertext
+            associated_data + omemo_authenticated_message.message
         ))[:AEADImpl.AUTHENTICATION_TAG_TRUNCATED_LENGTH]
 
         if new_auth != omemo_authenticated_message.mac:
