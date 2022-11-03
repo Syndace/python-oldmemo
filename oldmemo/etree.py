@@ -115,6 +115,7 @@ MESSAGE_SCHEMA = xmlschema.XMLSchema11("""<?xml version="1.1" encoding="utf8"?>
     xmlns="eu.siacs.conversations.axolotl">
 
     <xs:element name="payload" type="xs:base64Binary"/>
+    <xs:element name="iv" type="xs:base64Binary"/>
 
     <xs:element name="key">
         <xs:complexType>
