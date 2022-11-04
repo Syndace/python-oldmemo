@@ -118,7 +118,7 @@ class AEADImpl(aead_aes_hmac.AEAD):
             pn=header.previous_sending_chain_length,
             dh_pub=header.ratchet_pub,
             ciphertext=ciphertext
-        ).SerializeToString(True)
+        ).SerializeToString()
 
         # Calculate the authentication tag over the associated data and the OMEMOMessage, truncate the
         # authentication tag to AUTHENTICATION_TAG_TRUNCATED_LENGTH bytes
@@ -129,7 +129,7 @@ class AEADImpl(aead_aes_hmac.AEAD):
         ))[:AEADImpl.AUTHENTICATION_TAG_TRUNCATED_LENGTH]
 
         # Serialize the authentication tag with the OMEMOMessage in an OMEMOAuthenticatedMessage.
-        return OMEMOAuthenticatedMessage(mac=auth, message=omemo_message).SerializeToString(True)
+        return OMEMOAuthenticatedMessage(mac=auth, message=omemo_message).SerializeToString()
 
     @classmethod
     async def decrypt(cls, ciphertext: bytes, key: bytes, associated_data: bytes) -> bytes:
@@ -227,7 +227,7 @@ class DoubleRatchetImpl(doubleratchet.DoubleRatchet):
             n=header.sending_chain_length,
             pn=header.previous_sending_chain_length,
             dh_pub=header.ratchet_pub
-        ).SerializeToString(True)
+        ).SerializeToString()
 
 
 class StateImpl(x3dh.BaseState):
@@ -610,7 +610,7 @@ class KeyExchangeImpl(KeyExchange):
             ik=self.__header.identity_key,
             ek=self.__header.ephemeral_key,
             message=authenticated_message_parsed
-        ).SerializeToString(True)
+        ).SerializeToString()
 
     @staticmethod
     def parse(key_exchange: bytes) -> Tuple[KeyExchangeImpl, bytes]:
@@ -642,7 +642,7 @@ class KeyExchangeImpl(KeyExchange):
             x3dh.Header(parsed.ik, parsed.ek, b"", b""),
             parsed.spk_id,
             parsed.pk_id
-        ), parsed.message.SerializeToString(True)
+        ), parsed.message.SerializeToString()
 
 
 class SessionImpl(Session):

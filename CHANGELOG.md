@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+### Changed
+- Increased the minimum version of protobuf to 3.20.3 after reports that earlier versions cause issues
+- Disabled protobuf's deterministic serialization in an attempt to achieve PyPy3 compatibility
+
 ## [1.0.1] - 3rd of November 2022
 
 ### Added

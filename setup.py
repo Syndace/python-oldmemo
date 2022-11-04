@@ -62,7 +62,7 @@ setup(
         "DoubleRatchet>=1.0.0,<2",
         "X3DH>=1.0.0,<2",
         "XEdDSA>=1.0.0,<2",
-        "protobuf>=3.12.4",
+        "protobuf>=3.20.3",
         "typing-extensions>=4.3.0"
     ],
     extras_require={
