@@ -1,6 +1,6 @@
 [![PyPI](https://img.shields.io/pypi/v/Twomemo.svg)](https://pypi.org/project/Twomemo/)
 [![PyPI - Python Version](https://img.shields.io/pypi/pyversions/Twomemo.svg)](https://pypi.org/project/Twomemo/)
-[![Build Status](https://github.com/Syndace/python-twomemo/actions/workflows/test-on-push.yml/badge.svg)](https://github.com/Syndace/python-twomemo/actions/workflows/test-on-push.yml)
+[![Build Status](https://github.com/Syndace/python-twomemo/actions/workflows/test-and-publish.yml/badge.svg)](https://github.com/Syndace/python-twomemo/actions/workflows/test-and-publish.yml)
 [![Documentation Status](https://readthedocs.org/projects/python-twomemo/badge/?version=latest)](https://python-twomemo.readthedocs.io/)
 
 # python-twomemo #
