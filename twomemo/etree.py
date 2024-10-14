@@ -35,7 +35,7 @@ DEVICE_LIST_SCHEMA = xmlschema.XMLSchema("""<?xml version='1.0' encoding='UTF-8'
 
     <xs:element name='devices'>
         <xs:complexType>
-            <xs:sequence maxOccurs='unbounded'>
+            <xs:sequence minOccurs='0' maxOccurs='unbounded'>
                 <xs:element ref='device'/>
             </xs:sequence>
         </xs:complexType>
