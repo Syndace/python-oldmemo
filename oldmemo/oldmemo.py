@@ -1272,10 +1272,10 @@ class Oldmemo(Backend):
             modes.GCM(initialization_vector),
             backend=default_backend()
         ).encryptor()
-        ciphertext = aes.update(plaintext) + aes.finalize()  # pylint: disable=no-member
+        ciphertext = aes.update(plaintext) + aes.finalize()
 
         # This authentication tag is not truncated
-        auth_tag = aes.tag  # pylint: disable=no-member
+        auth_tag = aes.tag
 
         return ContentImpl(ciphertext, initialization_vector), PlainKeyMaterialImpl(key, auth_tag)
 
@@ -1324,7 +1324,7 @@ class Oldmemo(Backend):
             backend=default_backend()
         ).decryptor()
         try:
-            return aes.update(content.ciphertext) + aes.finalize()  # pylint: disable=no-member
+            return aes.update(content.ciphertext) + aes.finalize()
         except InvalidTag as e:
             raise DecryptionFailed("Ciphertext decryption failed.") from e
 
