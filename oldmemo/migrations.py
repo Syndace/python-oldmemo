@@ -1,5 +1,5 @@
 # This import from future (theoretically) enables sphinx_autodoc_typehints to handle type aliases better
-from __future__ import annotations  # pylint: disable=unused-variable
+from __future__ import annotations
 
 from abc import ABC, abstractmethod
 import base64
@@ -16,7 +16,7 @@ import xeddsa
 from .oldmemo import NAMESPACE, BundleImpl, StateImpl
 
 
-__all__ = [  # pylint: disable=unused-variable
+__all__ = [
     "OwnData",
     "Trust",
     "Session",
@@ -29,7 +29,6 @@ __all__ = [  # pylint: disable=unused-variable
 
 
 class OwnData(TypedDict):
-    # pylint: disable=invalid-name
     """
     This TypedDict describes how the own data was expected to be returned by the corresponding legacy storage
     method.
@@ -40,7 +39,6 @@ class OwnData(TypedDict):
 
 
 class Trust(TypedDict):
-    # pylint: disable=invalid-name
     """
     This TypedDict describes how trust information was expected to be returned by the corresponding legacy
     storage method.
@@ -51,7 +49,6 @@ class Trust(TypedDict):
 
 
 class Session(TypedDict):
-    # pylint: disable=invalid-name
     """
     This TypedDict describes how session instances (more precisely ``ExtendedDoubleRatchet`` instances) were
     serialized in the pre-stable serialization format.
@@ -62,7 +59,6 @@ class Session(TypedDict):
 
 
 class BoundOTPK(TypedDict):
-    # pylint: disable=invalid-name
     """
     Used as part of the legacy state format to represent a bound pre key.
     """
@@ -72,7 +68,6 @@ class BoundOTPK(TypedDict):
 
 
 class StateSuper(TypedDict):
-    # pylint: disable=invalid-name
     """
     Used as part of the legacy state format to represent the super class of the ``X3DHDoubleRatchet``.
     """
@@ -85,7 +80,6 @@ class StateSuper(TypedDict):
 
 
 class State(TypedDict):
-    # pylint: disable=invalid-name
     """
     This TypedDict describes how the state (more precisely ``X3DHDoubleRatchet``) was serialized in the
     pre-stable serialization format. Note that the ``pk_messages`` entry has been omitted from this type since
