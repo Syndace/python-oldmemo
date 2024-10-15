@@ -6,3 +6,4 @@ ignore = E201,E202,W503
 exclude = *_pb2.py
 per-file-ignores =
     twomemo/project.py:E203
+    twomemo/__init__.py:F401

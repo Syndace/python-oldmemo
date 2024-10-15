@@ -1,5 +1,5 @@
 # This import from future (theoretically) enables sphinx_autodoc_typehints to handle type aliases better
-from __future__ import annotations  # pylint: disable=unused-variable
+from __future__ import annotations
 
 import base64
 import secrets
@@ -35,7 +35,7 @@ from .twomemo_pb2 import (  # pylint: disable=no-name-in-module
 )
 
 
-__all__ = [  # pylint: disable=unused-variable
+__all__ = [
     "Twomemo",
     "NAMESPACE",
     "AEADImpl",

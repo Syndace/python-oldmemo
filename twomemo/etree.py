@@ -15,7 +15,7 @@ except ImportError as e:
 from .twomemo import NAMESPACE, BundleImpl, ContentImpl, EncryptedKeyMaterialImpl, KeyExchangeImpl
 
 
-__all__ = [  # pylint: disable=unused-variable
+__all__ = [
     "serialize_device_list",
     "parse_device_list",
     "serialize_bundle",
