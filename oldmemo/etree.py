@@ -96,12 +96,12 @@ BUNDLE_SCHEMA = xmlschema.XMLSchema("""<?xml version="1.0" encoding="utf8"?>
 
     <xs:element name="bundle">
         <xs:complexType>
-            <xs:sequence>
+            <xs:all>
                 <xs:element ref="signedPreKeyPublic"/>
                 <xs:element ref="signedPreKeySignature"/>
                 <xs:element ref="identityKey"/>
                 <xs:element ref="prekeys"/>
-            </xs:sequence>
+            </xs:all>
         </xs:complexType>
     </xs:element>
 </xs:schema>

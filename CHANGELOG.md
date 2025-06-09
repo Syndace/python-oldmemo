@@ -11,6 +11,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Fixed
 - Correctly parse the value of the kex attribute as a boolean
 
+### Changed
+- Relax XML schema strictness w.r.t. the order of elements in the bundle
+
 ### Removed
 - Removed project.py and simplified version.py as part of the migration towards pyproject.toml
 
