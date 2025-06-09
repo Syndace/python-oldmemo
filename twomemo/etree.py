@@ -342,7 +342,7 @@ def parse_message(element: ET.Element, bare_jid: str) -> Message:
 
             key_exchange: Optional[KeyExchangeImpl] = None
             authenticated_message: bytes
-            if bool(key_elt.get("kex", False)):
+            if key_elt.get("kex", "false") in [ "true", "1" ]:
                 key_exchange, authenticated_message = KeyExchangeImpl.parse(content)
             else:
                 authenticated_message = content
