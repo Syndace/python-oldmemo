@@ -9,7 +9,7 @@ try:
 except ImportError as e:
     raise ImportError(
         "Optional dependency xmlschema not found. Please install xmlschema, or install this package using"
-        " `pip install python-twomemo[xml]`, to use the ElementTree-based XML serialization/parser helpers."
+        " `pip install twomemo[xml]`, to use the ElementTree-based XML serialization/parser helpers."
     ) from e
 
 from .twomemo import NAMESPACE, BundleImpl, ContentImpl, EncryptedKeyMaterialImpl, KeyExchangeImpl
@@ -180,8 +180,8 @@ def parse_device_list(element: ET.Element) -> Dict[int, Optional[str]]:
         optional label.
 
     Raises:
-        XMLSchemaValidationError: in case the element does not conform to the XML schema given in the
-            specification.
+        xmlschema.XMLSchemaValidationError: in case the element does not conform to the XML schema given in
+            the specification.
     """
 
     DEVICE_LIST_SCHEMA.validate(element)
@@ -242,8 +242,8 @@ def parse_bundle(element: ET.Element, bare_jid: str, device_id: int) -> BundleIm
         The extracted bundle.
 
     Raises:
-        XMLSchemaValidationError: in case the element does not conform to the XML schema given in the
-            specification.
+        xmlschema.XMLSchemaValidationError: in case the element does not conform to the XML schema given in
+            the specification.
     """
 
     BUNDLE_SCHEMA.validate(element)
@@ -323,8 +323,8 @@ def parse_message(element: ET.Element, bare_jid: str) -> Message:
 
     Raises:
         ValueError: in case there is malformed data not caught be the XML schema validation.
-        XMLSchemaValidationError: in case the element does not conform to the XML schema given in the
-            specification.
+        xmlschema.XMLSchemaValidationError: in case the element does not conform to the XML schema given in
+            the specification.
     """
 
     MESSAGE_SCHEMA.validate(element)

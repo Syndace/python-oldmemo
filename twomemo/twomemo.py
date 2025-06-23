@@ -1,4 +1,3 @@
-# This import from future (theoretically) enables sphinx_autodoc_typehints to handle type aliases better
 from __future__ import annotations
 
 import base64
@@ -199,7 +198,7 @@ class AEADImpl(aead_aes_hmac.AEAD):
             The original associated data and the header used to build it.
 
         Raises:
-            DecryptionFailedException: if the data is malformed.
+            doubleratchet.DecryptionFailedException: if the data is malformed.
         """
 
         associated_data_length = StateImpl.IDENTITY_KEY_ENCODING_LENGTH * 2
@@ -629,8 +628,8 @@ class KeyExchangeImpl(KeyExchange):
             The OMEMOKeyExchange message structure only contains the ids of the signed pre key and the pre key
             used for the key exchange, not the full public keys. Since the job of this method is just parsing,
             the X3DH header is initialized without the public keys here, and the code using instances of this
-            class has to handle the public key lookup from the ids. Use :attr:`header_filled` to check whether
-            the header is filled with the public keys.
+            class has to handle the public key lookup from the ids. Use :meth:`is_network_instance` to check
+            whether the header is a full or a partial (network) instance.
         """
 
         try:
@@ -755,12 +754,13 @@ class Twomemo(Backend):
                 the backend namespace to avoid name clashes between backends.
             max_num_per_session_skipped_keys: The maximum number of skipped message keys to keep around per
                 session. Once the maximum is reached, old message keys are deleted to make space for newer
-                ones. Accessible via :attr:`max_num_per_session_skipped_keys`.
+                ones. Accessible via :attr:`~omemo.backend.Backend.max_num_per_session_skipped_keys`.
             max_num_per_message_skipped_keys: The maximum number of skipped message keys to accept in a single
                 message. When set to ``None`` (the default), this parameter defaults to the per-session
                 maximum (i.e. the value of the ``max_num_per_session_skipped_keys`` parameter). This parameter
                 may only be 0 if the per-session maximum is 0, otherwise it must be a number between 1 and the
-                per-session maximum. Accessible via :attr:`max_num_per_message_skipped_keys`.
+                per-session maximum. Accessible via
+                :attr:`~omemo.backend.Backend.max_num_per_message_skipped_keys`.
         """
 
         super().__init__(max_num_per_session_skipped_keys, max_num_per_message_skipped_keys)
