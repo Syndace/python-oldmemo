@@ -1,3 +1,90 @@
 [build-system]
-requires = [ "setuptools", "wheel" ]
+requires = [ "setuptools" ]
 build-backend = "setuptools.build_meta"
+
+[project]
+name = "Twomemo"
+description = "Backend implementation of the namespace `urn:xmpp:omemo:2` for python-omemo."
+readme = "README.md"
+dynamic = [ "version" ]
+authors = [
+    { name = "Tim Henkes (Syndace)", email = "me@syndace.dev" }
+]
+maintainers = [ { name = "Tim Henkes (Syndace)", email = "me@syndace.dev" } ]
+license = "MIT"
+license-files = [ "LICENSE" ]
+requires-python = ">= 3.9"
+dependencies = [
+    "OMEMO>=1.0.0,<2",
+    "DoubleRatchet>=1.0.0,<2",
+    "X3DH>=1.0.0,<2",
+    "XEdDSA>=1.0.0,<2",
+    "protobuf>=3.20.3",
+    "typing-extensions>=4.3.0"
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Programming Language :: Python :: Implementation :: PyPy",
+
+    "Intended Audience :: Developers",
+    "Topic :: Communications :: Chat",
+    "Topic :: Security :: Cryptography"
+]
+
+[tool.setuptools.dynamic]
+version = { attr = "twomemo.version.__version__" }
+
+[tool.setuptools.packages.find]
+exclude = [ "tests" ]
+
+[project.optional-dependencies]
+xml = [
+    "xmlschema>=2.0.2"
+]
+docs = [
+    "twomemo[xml]",
+    "sphinx",
+    "sphinx-rtd-theme",
+    "sphinx-autodoc-typehints"
+]
+lint = [
+    "twomemo[xml]",
+    "mypy",
+    "types-protobuf",
+    "pylint",
+    "flake8",
+    "flake8-pyproject"
+]
+dev = [
+    "twomemo[xml,docs,lint]",
+    "mypy-protobuf"
+]
+
+[project.urls]
+Documentation = "https://python-twomemo.readthedocs.io/"
+Repository = "https://github.com/Syndace/python-twomemo"
+Issues = "https://github.com/Syndace/python-twomemo/issues"
+Changelog = "https://github.com/Syndace/python-twomemo/blob/main/CHANGELOG.md"
+
+[tool.mypy]
+strict = true
+
+[tool.flake8]
+max-line-length = 110
+doctests = true
+ignore = [ "E201", "E202", "W503" ]
+exclude = "*_pb2.py"
+per-file-ignores = [
+    "twomemo/__init__.py:F401"
+]

@@ -16,7 +16,7 @@ Install the latest release using pip (`pip install twomemo`) or manually from so
 Install `protoc`. Then, in the root directory of this repository, run:
 
 ```sh
-$ pip install protobuf mypy mypy-protobuf types-protobuf
+$ pip install --upgrade .[dev]
 $ protoc --python_out=twomemo/ --mypy_out=twomemo/ twomemo.proto
 ```
 
@@ -27,12 +27,12 @@ This will generate `twomemo/twomemo_pb2.py` and `twomemo/twomemo_pb2.pyi`.
 python-twomemo uses [mypy](http://mypy-lang.org/) for static type checks and both [pylint](https://pylint.pycqa.org/en/latest/) and [Flake8](https://flake8.pycqa.org/en/latest/) for linting. All checks can be run locally with the following commands:
 
 ```sh
-$ pip install --upgrade mypy pylint flake8 mypy-protobuf types-protobuf
-$ mypy --strict twomemo/ setup.py
-$ pylint twomemo/ setup.py
-$ flake8 twomemo/ setup.py
+$ pip install --upgrade .[lint]
+$ mypy twomemo/
+$ pylint twomemo/
+$ flake8 twomemo/
 ```
 
 ## Getting Started ##
 
-Refer to the documentation on [readthedocs.io](https://python-twomemo.readthedocs.io/), or build/view it locally in the `docs/` directory. To build the docs locally, install the requirements listed in `docs/requirements.txt`, e.g. using `pip install -r docs/requirements.txt`, and then run `make html` from within the `docs/` directory. The documentation can then be found in `docs/_build/html/`.
+Refer to the documentation on [readthedocs.io](https://python-twomemo.readthedocs.io/), or build it locally. Additional requirements to build the docs can be installed using `pip install .[docs]`. With all dependencies installed, run `make html` in the `docs/` directory. The documentation can then be found in `docs/_build/html/`.
