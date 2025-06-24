@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+## [1.2.0] - 24th of June 2025
+
 ### Fixed
 - Correctly parse the value of the kex attribute as a boolean
 
@@ -49,7 +51,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Added
 - Initial release.
 
-[Unreleased]: https://github.com/Syndace/python-twomemo/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/Syndace/python-twomemo/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/Syndace/python-twomemo/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/Syndace/python-twomemo/compare/v1.0.4...v1.1.0
 [1.0.4]: https://github.com/Syndace/python-twomemo/compare/v1.0.3...v1.0.4
 [1.0.3]: https://github.com/Syndace/python-twomemo/compare/v1.0.2...v1.0.3
