@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+### Added
+- Update for python-omemo v2.0.0, introducing improved device label handling with label signing
+
+### Changed
+- Changed etree device list parsing helpers to include new device label signatures
+
 ## [1.2.0] - 24th of June 2025
 
 ### Fixed

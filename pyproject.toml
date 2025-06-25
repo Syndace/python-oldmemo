@@ -15,7 +15,7 @@ license = "MIT"
 license-files = [ "LICENSE" ]
 requires-python = ">= 3.9"
 dependencies = [
-    "OMEMO>=1.3.0,<2",
+    "OMEMO>=2.0.0,<3",
     "DoubleRatchet>=1.2.0,<2",
     "X3DH>=1.2.0,<2",
     "XEdDSA>=1.0.0,<2",

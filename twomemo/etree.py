@@ -1,8 +1,8 @@
 import base64
-from typing import Dict, Optional, Set, Tuple, cast
+from typing import Optional, Set, Tuple, cast
 import xml.etree.ElementTree as ET
 
-from omemo import EncryptedKeyMaterial, KeyExchange, Message
+from omemo import DeviceList, EncryptedKeyMaterial, KeyExchange, Message, SignedLabel
 import x3dh
 try:
     import xmlschema
@@ -45,6 +45,7 @@ DEVICE_LIST_SCHEMA = xmlschema.XMLSchema("""<?xml version='1.0' encoding='UTF-8'
         <xs:complexType>
             <xs:attribute name='id' type='xs:unsignedInt' use='required'/>
             <xs:attribute name='label' type='xs:string'/>
+            <xs:attribute name='labelsig' type='xs:base64Binary'/>
         </xs:complexType>
     </xs:element>
 </xs:schema>
@@ -149,11 +150,11 @@ MESSAGE_SCHEMA = xmlschema.XMLSchema("""<?xml version='1.0' encoding='UTF-8'?>
 """)
 
 
-def serialize_device_list(device_list: Dict[int, Optional[str]]) -> ET.Element:
+def serialize_device_list(device_list: DeviceList) -> ET.Element:
     """
     Args:
         device_list: The device list to serialize. The first entry of each tuple is the device id, and the
-            second entry is the optional label.
+            second entry is the optional signed label.
 
     Returns:
         The serialized device list as an XML element.
@@ -161,23 +162,24 @@ def serialize_device_list(device_list: Dict[int, Optional[str]]) -> ET.Element:
 
     devices_elt = ET.Element(f"{NS}devices")
 
-    for device_id, label in device_list.items():
+    for device_id, signed_label in device_list.items():
         device_elt = ET.SubElement(devices_elt, f"{NS}device")
         device_elt.set("id", str(device_id))
-        if label is not None:
-            device_elt.set("label", label)
+        if signed_label is not None:
+            device_elt.set("label", signed_label.label)
+            device_elt.set("labelsig", base64.b64encode(signed_label.signature).decode("ASCII"))
 
     return devices_elt
 
 
-def parse_device_list(element: ET.Element) -> Dict[int, Optional[str]]:
+def parse_device_list(element: ET.Element) -> DeviceList:
     """
     Args:
         element: The XML element to parse the device list from.
 
     Returns:
         The extracted device list. The first entry of each tuple is the device id, and the second entry is the
-        optional label.
+        optional signed label.
 
     Raises:
         xmlschema.XMLSchemaValidationError: in case the element does not conform to the XML schema given in
@@ -186,11 +188,20 @@ def parse_device_list(element: ET.Element) -> Dict[int, Optional[str]]:
 
     DEVICE_LIST_SCHEMA.validate(element)
 
-    return {
-        int(cast(str, device_elt.get("id"))): device_elt.get("label", None)
-        for device_elt
-        in element.iter(f"{NS}device")
-    }
+    device_list: DeviceList = {}
+
+    for device_elt in element.iter(f"{NS}device"):
+        device_id = int(cast(str, device_elt.get("id")))
+
+        label = device_elt.get("label", None)
+        signature = device_elt.get("labelsig", None)
+
+        device_list[device_id] = None if label is None or signature is None else SignedLabel(
+            label=label,
+            signature=base64.b64decode(signature.encode("ASCII"))
+        )
+
+    return device_list
 
 
 def serialize_bundle(bundle: BundleImpl) -> ET.Element:

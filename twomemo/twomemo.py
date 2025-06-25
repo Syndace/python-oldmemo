@@ -25,6 +25,7 @@ from omemo.message import Content, EncryptedKeyMaterial, PlainKeyMaterial, KeyEx
 from omemo.session import Initiation, Session
 from omemo.storage import Storage
 from omemo.types import JSONType
+import xeddsa
 
 # https://github.com/PyCQA/pylint/issues/4987
 from .twomemo_pb2 import (  # pylint: disable=no-name-in-module
@@ -1272,6 +1273,19 @@ class Twomemo(Backend):
                 if pre_key in bundle.pre_keys
             }
         )
+
+    @property
+    def supports_labels(self) -> bool:
+        return True
+
+    async def sign_own_label(self, label: str) -> bytes:
+        return xeddsa.ed25519_priv_sign(
+            (await IdentityKeyPair.get(self.__storage)).as_priv().priv,
+            label.encode("UTF-8")
+        )
+
+    async def verify_label_signature(self, label: str, signature: bytes, identity_key: bytes) -> bool:
+        return xeddsa.ed25519_verify(signature, identity_key, label.encode("UTF-8"))
 
     async def purge(self) -> None:
         for bare_jid in (await self.__storage.load_list(f"/{self.namespace}/bare_jids", str)).maybe([]):
