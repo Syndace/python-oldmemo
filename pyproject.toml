@@ -46,7 +46,8 @@ classifiers = [
 version = { attr = "twomemo.version.__version__" }
 
 [tool.setuptools.packages.find]
-exclude = [ "tests" ]
+include = [ "twomemo", "twomemo.*" ]
+namespaces = false
 
 [project.optional-dependencies]
 xml = [
